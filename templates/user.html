@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Page - AI Chat Interface</title>
+    
+    <!-- REM: User Page Template
+    - This page provides user management functionality including archived chats/projects
+    - Links to admin panel and API key management for appropriate users
+    - External CSS and JS files for maintainability
+    - Clean navigation structure for user-related functions
+    -->
+    
+    <!-- External Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/user.css') }}">
+</head>
+<body>
+    <div class="user-container">
+        <!-- Header -->
+        <div class="user-header">
+            <h1>👤 User Dashboard</h1>
+            <p>Manage your account, archived items, and system access</p>
+        </div>
+        
+        <!-- Navigation -->
+        <div class="user-nav">
+            <a href="/chat" class="back-btn">← Back to Chat</a>
+            <a href="/files" class="nav-btn">📁 Files</a>
+            <button class="nav-btn active" onclick="showSection('archives')">Archives</button>
+            <button class="nav-btn" onclick="showSection('profile')">Profile</button>
+        </div>
+        
+        <!-- Content Area -->
+        <div class="user-content">
+            <div id="message-area"></div>
+            
+            <!-- Archives Section -->
+            <div id="archives-section" class="section active">
+                <h2>📦 Chat & Project Management</h2>
+                <p class="section-description">Manage your conversations and projects across three levels: Active (front page), Hidden (not on front page), and Archived (simple listing).</p>
+                
+                <!-- Active Conversations -->
+                <div class="archive-subsection">
+                    <h3>📌 Active Conversations</h3>
+                    <p class="subsection-description">Conversations currently shown on the front page. Click to open or manage their visibility.</p>
+                    <div class="archive-controls">
+                        <input type="text" id="activeChatsSearch" placeholder="Search active chats..." class="search-input">
+                        <button onclick="loadActiveChats()" class="refresh-btn">🔄 Refresh</button>
+                    </div>
+                    <div class="archived-items-container">
+                        <div id="active-chats-loading" class="loading">Loading active conversations...</div>
+                        <div id="active-chats-list" class="archived-items-list"></div>
+                    </div>
+                </div>
+                
+                <!-- Active Projects -->
+                <div class="archive-subsection">
+                    <h3>📌 Active Projects</h3>
+                    <p class="subsection-description">Projects currently shown on the front page. Click to open or manage their visibility.</p>
+                    <div class="archive-controls">
+                        <input type="text" id="activeProjectsSearch" placeholder="Search active projects..." class="search-input">
+                        <button onclick="loadActiveProjects()" class="refresh-btn">🔄 Refresh</button>
+                    </div>
+                    <div class="archived-items-container">
+                        <div id="active-projects-loading" class="loading">Loading active projects...</div>
+                        <div id="active-projects-list" class="archived-items-list"></div>
+                    </div>
+                </div>
+                
+                <!-- Hidden Conversations -->
+                <div class="archive-subsection">
+                    <h3>👁️ Hidden Conversations</h3>
+                    <p class="subsection-description">Conversations removed from front page but still accessible. Click to open or manage.</p>
+                    <div class="archive-controls">
+                        <input type="text" id="hiddenChatsSearch" placeholder="Search hidden chats..." class="search-input">
+                        <button onclick="loadHiddenChats()" class="refresh-btn">🔄 Refresh</button>
+                    </div>
+                    <div class="archived-items-container">
+                        <div id="hidden-chats-loading" class="loading">Loading hidden conversations...</div>
+                        <div id="hidden-chats-list" class="archived-items-list"></div>
+                    </div>
+                </div>
+                
+                <!-- Hidden Projects -->
+                <div class="archive-subsection">
+                    <h3>👁️ Hidden Projects</h3>
+                    <p class="subsection-description">Projects removed from front page but still accessible. Click to open or manage.</p>
+                    <div class="archive-controls">
+                        <input type="text" id="hiddenProjectsSearch" placeholder="Search hidden projects..." class="search-input">
+                        <button onclick="loadHiddenProjects()" class="refresh-btn">🔄 Refresh</button>
+                    </div>
+                    <div class="archived-items-container">
+                        <div id="hidden-projects-loading" class="loading">Loading hidden projects...</div>
+                        <div id="hidden-projects-list" class="archived-items-list"></div>
+                    </div>
+                </div>
+                
+                <!-- Archived Conversations -->
+                <div class="archive-subsection">
+                    <h3>📦 Archived Conversations</h3>
+                    <p class="subsection-description">Fully archived conversations. Can be reactivated to front page.</p>
+                    <div class="archive-controls">
+                        <input type="text" id="archivedChatsSearch" placeholder="Search archived chats..." class="search-input">
+                        <button onclick="loadArchivedChats()" class="refresh-btn">🔄 Refresh</button>
+                    </div>
+                    <div class="archived-items-container">
+                        <div id="archived-chats-loading" class="loading">Loading archived conversations...</div>
+                        <div id="archived-chats-list" class="archived-items-list"></div>
+                    </div>
+                </div>
+                
+                <!-- Archived Projects -->
+                <div class="archive-subsection">
+                    <h3>📦 Archived Projects</h3>
+                    <p class="subsection-description">Fully archived projects. Can be reactivated to front page.</p>
+                    <div class="archive-controls">
+                        <input type="text" id="archivedProjectsSearch" placeholder="Search archived projects..." class="search-input">
+                        <button onclick="loadArchivedProjects()" class="refresh-btn">🔄 Refresh</button>
+                    </div>
+                    <div class="archived-items-container">
+                        <div id="archived-projects-loading" class="loading">Loading archived projects...</div>
+                        <div id="archived-projects-list" class="archived-items-list"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Profile Section -->
+            <div id="profile-section" class="section">
+                <h2>👤 Profile Settings</h2>
+                <div class="profile-info">
+                    <div class="info-group">
+                        <label>Username:</label>
+                        <span>{{ current_user.username }}</span>
+                    </div>
+                    <div class="info-group">
+                        <label>Name:</label>
+                        <span>{{ current_user.name }}</span>
+                    </div>
+                    <div class="info-group">
+                        <label>Email:</label>
+                        <span>{{ current_user.email }}</span>
+                    </div>
+                    <div class="info-group">
+                        <label>Account Type:</label>
+                        <span class="badge {{ 'admin-badge' if current_user.is_admin else 'user-badge' }}">
+                            {{ 'Administrator' if current_user.is_admin else 'User' }}
+                        </span>
+                    </div>
+                    <div class="info-group">
+                        <label>Access Status:</label>
+                        <span class="badge {{ 'status-allowed' if current_user.allowedaccess == 'yes' else 'status-denied' }}">
+                            {{ 'Allowed' if current_user.allowedaccess == 'yes' else 'Denied' }}
+                        </span>
+                    </div>
+                    <div class="info-group">
+                        <label>Member Since:</label>
+                        <span>{{ current_user.created_at.strftime('%B %d, %Y') if current_user.created_at else 'Unknown' }}</span>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <h3>Quick Actions</h3>
+                    <button onclick="showChangePasswordModal()" class="action-btn btn-primary">🔑 Change Password</button>
+                    {% if current_user.is_admin %}
+                    <button onclick="window.location.href='/admin'" class="action-btn btn-warning">⚙️ Admin Panel</button>
+                    <button onclick="showSection('api-keys')" class="action-btn btn-info">🔐 Manage API Keys</button>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Admin Panel Section (for admins only) -->
+            {% if current_user.is_admin %}
+            <div id="admin-section" class="section">
+                <h2>⚙️ Admin Panel</h2>
+                <p>Administrative functions for managing users and system settings.</p>
+                <div class="admin-links">
+                    <a href="/admin" class="admin-link-btn">
+                        <span class="link-icon">👥</span>
+                        <div class="link-content">
+                            <h4>User Management</h4>
+                            <p>Manage user accounts, permissions, and access</p>
+                        </div>
+                    </a>
+                    <a href="/admin#keys" class="admin-link-btn">
+                        <span class="link-icon">🔐</span>
+                        <div class="link-content">
+                            <h4>API Key Management</h4>
+                            <p>Create, view, and manage API keys</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Change Password Modal -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔑 Change Password</h3>
+                <span class="close" onclick="closeChangePasswordModal()">&times;</span>
+            </div>
+            <form id="changePasswordForm">
+                <div class="form-group">
+                    <label for="currentPassword">Current Password:</label>
+                    <input type="password" id="currentPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">New Password:</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmNewPassword">Confirm New Password:</label>
+                    <input type="password" id="confirmNewPassword" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="action-btn btn-primary">Update Password</button>
+                    <button type="button" onclick="closeChangePasswordModal()" class="action-btn btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- External JavaScript -->
+    <script src="{{ url_for('static', filename='js/user.js') }}"></script>
+</body>
+</html>

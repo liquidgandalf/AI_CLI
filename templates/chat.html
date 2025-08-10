@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat Interface</title>
+    
+    <!-- 
+    REM/Notes for AI:
+    - Main stylesheet is located at: /static/css/chat.css
+    - Main JavaScript file is located at: /static/js/chat.js
+    - This HTML file contains only the structure and minimal inline scripts
+    - All styling should be added to the external CSS file
+    - All functionality should be added to the external JavaScript file
+    -->
+    
+    <!-- External Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- External Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Mobile Chat History Toggle -->
+        <button class="mobile-toggle-btn" id="chatHistoryToggle">
+            <span class="toggle-icon">▼</span>
+            💬 Chat History
+        </button>
+        
+        <!-- Sidebar -->
+        <div class="sidebar mobile-section" id="chatHistorySection">
+            <div class="sidebar-header">
+                <h2>💬 Chat History</h2>
+                <button class="new-chat-btn" id="newChatBtn">+ New Chat</button>
+            </div>
+            <div class="conversations-container">
+                <div class="conversations-search" style="padding: 10px; border-bottom: 1px solid #e9ecef;">
+                    <input type="text" id="conversationSearch" placeholder="Search conversations..." 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                </div>
+                <div id="projectFilesSection" style="padding: 10px; border-bottom: 1px solid #e9ecef; display: none;">
+                    <button id="projectFilesBtn" class="new-chat-btn" style="width: 100%; background: #28a745; margin-bottom: 10px;">
+                        📁 Project Files (<span id="projectFilesCount">0</span>)
+                    </button>
+                    <div id="projectFilesList" style="display: none; max-height: 200px; overflow-y: auto; background: #f8f9fa; border-radius: 4px; padding: 8px;">
+                        <!-- Project files will be displayed here -->
+                    </div>
+                </div>
+                <div class="conversations-list" id="conversationsList">
+                    <div style="text-align: center; padding: 20px; color: #6c757d;">
+                        Loading conversations...
+                    </div>
+                </div>
+                <div class="conversations-footer" style="padding: 10px; border-top: 1px solid #e9ecef; font-size: 12px; color: #6c757d; text-align: center;" id="conversationsCount">
+                    <!-- Conversation count will be displayed here -->
+                </div>
+                
+                <div class="admin-section" id="adminSection" style="border-top: 1px solid #e9ecef; padding: 15px; display: none;">
+                    <h4 style="margin-bottom: 10px; font-size: 14px; color: #495057;">Administration</h4>
+                    <a href="/admin" class="new-chat-btn" style="width: 100%; margin-bottom: 5px; background: #dc3545; text-decoration: none; display: block; text-align: center;">Admin Panel</a>
+                    <p style="font-size: 12px; color: #6c757d; margin: 0;">Manage users, API keys, and system settings</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Projects Toggle -->
+        <button class="mobile-toggle-btn" id="projectsToggle">
+            <span class="toggle-icon">▼</span>
+            📁 Projects
+        </button>
+        
+        <!-- Projects Panel -->
+        <div class="projects-panel mobile-section" id="projectsSection">
+            <div class="projects-header">
+                <h3 style="margin-bottom: 5px;">📁 Projects</h3>
+                <button class="new-chat-btn" id="newProjectBtn" style="width: 100%; margin-top: 10px;">+ New Project</button>
+            </div>
+            
+            <div id="projectModeIndicator" class="project-mode-indicator" style="display: none;">
+                Project Mode: <span id="currentProjectName"></span>
+                <button onclick="switchToGeneralMode()" style="float: right; background: #6c757d; color: white; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 10px;">Exit</button>
+            </div>
+            
+            <div class="projects-search" style="padding: 10px; border-bottom: 1px solid #e9ecef;">
+                <input type="text" id="projectSearch" placeholder="Search projects..." 
+                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+            </div>
+            
+            <div class="projects-list" id="projectsList">
+                <div style="text-align: center; padding: 20px; color: #6c757d;">
+                    Loading projects...
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="chat-container">
+                <div class="chat-header">
+                    <h1>🤖 AI Chat Interface</h1>
+                    <div class="model-info">
+                        <label for="modelSelect">AI Model:</label>
+                        <select id="modelSelect" class="model-dropdown">
+                            <option value="gpt-oss:20b">gpt-oss:20b (loading...)</option>
+                        </select>
+                        <div class="user-menu" style="float: right;">
+                            <button class="user-icon-btn" id="userMenuBtn">
+                                <span class="user-icon">👤</span>
+                                <span class="user-name">{{ current_user.name }}</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="user-dropdown" id="userDropdown">
+                                <a href="#" class="dropdown-item" id="userPageLink">
+                                    <span class="dropdown-icon">👤</span>
+                                    User Page
+                                </a>
+                                {% if current_user.is_admin %}
+                                <a href="#" class="dropdown-item" id="adminPageLink">
+                                    <span class="dropdown-icon">⚙️</span>
+                                    Admin Panel
+                                </a>
+                                {% endif %}
+                                <div class="dropdown-divider"></div>
+                                <a href="{{ url_for('logout') }}" class="dropdown-item">
+                                    <span class="dropdown-icon">🚪</span>
+                                    Logout
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message ai">
+                        <div class="message-content">
+                            Hello! I'm your local AI assistant. How can I help you today?
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="loading" id="loading">
+                    AI is thinking...
+                </div>
+                
+                <div class="chat-input">
+                    <div class="input-group">
+                        <div class="input-row">
+                            <label class="input-label">URL:</label>
+                            <input type="url" id="urlInput" placeholder="Enter URL to fetch content (optional)" autocomplete="off">
+                            <button id="fetchButton">Fetch</button>
+                        </div>
+                        <div class="input-row">
+                            <label class="input-label">Dataset:</label>
+                            <textarea id="datasetInput" placeholder="Enter your dataset or data context here..." autocomplete="off"></textarea>
+                        </div>
+                        <div class="input-row">
+                            <label class="input-label">Files:</label>
+                            <div class="file-upload-area">
+                                <input type="file" id="fileInput" multiple accept=".mp3,.wav,.ogg,.m4a,.aac,.flac,.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.txt,.md,.html,.css,.js,.json,.xml,.py,.sql,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.tar,.gz,.rar" style="display: none;">
+                                <button type="button" id="uploadButton" class="upload-btn">📎 Attach Files</button>
+                                <div id="fileList" class="file-list"></div>
+                            </div>
+                        </div>
+                        <div class="input-row">
+                            <label class="input-label">Question:</label>
+                            <textarea id="questionInput" placeholder="Ask a question about the dataset..." autocomplete="off"></textarea>
+                            <button id="sendButton">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Container for Notifications -->
+    <div class="message-container" id="messageContainer"></div>
+
+    <!-- External JavaScript -->
+    <script src="{{ url_for('static', filename='js/chat.js') }}?v=20250808154300"></script>
+    
+    <!-- Minimal Inline Scripts (only essential functions that need to be global) -->
+    <script>
+        // Global utility functions that need to be accessible from onclick handlers
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = '/logout';
+            }
+        }
+        
+        function showMessage(message, type = 'success') {
+            const messageContainer = document.getElementById('messageContainer');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert ${type}`;
+            alertDiv.textContent = message;
+            
+            messageContainer.appendChild(alertDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.parentNode.removeChild(alertDiv);
+                }
+            }, 5000);
+        }
+        
+        function showError(message) {
+            showMessage(message, 'error');
+        }
+        
+        // Check admin status and show admin section if user is admin
+        async function checkAdminStatus() {
+            try {
+                const response = await fetch('/api/user/status');
+                const data = await response.json();
+                
+                if (response.ok && data.is_admin) {
+                    const adminSection = document.getElementById('adminSection');
+                    if (adminSection) {
+                        adminSection.style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.log('Could not check admin status:', error);
+            }
+        }
+    </script>
+</body>
+</html>

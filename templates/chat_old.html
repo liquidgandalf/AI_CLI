@@ -1,0 +1,2281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat Interface</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+        }
+        
+        .app-container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            background: white;
+            margin: 20px;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: #f8f9fa;
+            border-right: 1px solid #e9ecef;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+            background: #2c3e50;
+            color: white;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+        }
+        
+        .new-chat-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .conversations-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .conversation-item {
+            padding: 12px;
+            margin-bottom: 5px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: 1px solid transparent;
+        }
+        
+        .conversation-item:hover {
+            background: #e9ecef;
+        }
+        
+        .conversation-item.active {
+            background: #007bff;
+            color: white;
+        }
+        
+        .conversation-title {
+            font-weight: 500;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        
+        .conversation-date {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .projects-panel {
+            width: 300px;
+            background: #f8f9fa;
+            border-left: 1px solid #e9ecef;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .projects-header {
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+            background: #2c3e50;
+            color: white;
+        }
+        
+        .projects-search {
+            padding: 10px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .projects-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .project-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .project-item:hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .project-item.active {
+            background: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+        
+        .project-item.drag-over {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+        
+        .project-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        
+        .project-info {
+            font-size: 12px;
+            opacity: 0.7;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .conversation-item.dragging {
+            opacity: 0.5;
+            transform: rotate(2deg);
+        }
+        
+        .project-mode-indicator {
+            background: #ffc107;
+            color: #212529;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 10px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        /* Star and Edit Button Styling */
+        .conversation-actions {
+            opacity: 0.6;
+            transition: opacity 0.2s ease;
+        }
+        
+        .conversation-item:hover .conversation-actions {
+            opacity: 1;
+        }
+        
+        .star-btn, .edit-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .star-btn:hover {
+            background: rgba(255, 193, 7, 0.2);
+            transform: scale(1.1);
+        }
+        
+        .edit-btn:hover {
+            background: rgba(0, 123, 255, 0.2);
+            transform: scale(1.1);
+        }
+        
+        .conversation-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        
+        .conversation-title {
+            flex: 1;
+            cursor: pointer;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* Project Edit Button Styling */
+        .project-actions {
+            opacity: 0.6;
+            transition: opacity 0.2s ease;
+        }
+        
+        .project-item:hover .project-actions {
+            opacity: 1;
+        }
+        
+        .edit-project-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .edit-project-btn:hover {
+            background: rgba(0, 123, 255, 0.2);
+            transform: scale(1.1);
+        }
+        
+        .project-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        
+        .project-name {
+            flex: 1;
+            cursor: pointer;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+        
+        /* File Upload Styling */
+        .file-upload-area {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .upload-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s ease;
+            align-self: flex-start;
+        }
+        
+        .upload-btn:hover {
+            background: #0056b3;
+        }
+        
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .file-icon {
+            font-size: 16px;
+        }
+        
+        .file-details {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .file-name {
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .file-meta {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        
+        .file-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .file-action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 3px;
+            font-size: 12px;
+            transition: background-color 0.2s ease;
+        }
+        
+        .file-action-btn:hover {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        .file-action-btn.delete {
+            color: #dc3545;
+        }
+        
+        .file-action-btn.download {
+            color: #28a745;
+        }
+        
+        .file-action-btn.project-toggle {
+            color: #007bff;
+        }
+        
+        .file-action-btn.project-toggle.important {
+            color: #ffc107;
+        }
+        
+        /* File type specific styling */
+        .file-item.audio { border-left: 4px solid #17a2b8; }
+        .file-item.image { border-left: 4px solid #28a745; }
+        .file-item.text { border-left: 4px solid #ffc107; }
+        .file-item.document { border-left: 4px solid #dc3545; }
+        .file-item.archive { border-left: 4px solid #6f42c1; }
+        .file-item.other { border-left: 4px solid #6c757d; }
+        
+        /* Project files styling */
+        .project-file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            padding: 6px 8px;
+            margin: 4px 0;
+            border-radius: 3px;
+            border: 1px solid #dee2e6;
+            font-size: 12px;
+        }
+        
+        .project-file-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .project-file-name {
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .project-file-meta {
+            font-size: 10px;
+            color: #6c757d;
+        }
+        
+        .project-file-actions {
+            display: flex;
+            gap: 3px;
+        }
+        
+        .project-file-actions .file-action-btn {
+            padding: 2px;
+            font-size: 10px;
+        }
+        
+        .chat-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .chat-header h1 {
+            margin-bottom: 5px;
+        }
+        
+        .model-info {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .message.user {
+            justify-content: flex-end;
+        }
+        
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+        
+        /* Markdown styling for AI responses */
+        .message.ai .message-content h1,
+        .message.ai .message-content h2,
+        .message.ai .message-content h3 {
+            margin: 16px 0 8px 0;
+            color: #2c3e50;
+        }
+        
+        .message.ai .message-content h1 {
+            font-size: 1.4em;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 4px;
+        }
+        
+        .message.ai .message-content h2 {
+            font-size: 1.2em;
+        }
+        
+        .message.ai .message-content h3 {
+            font-size: 1.1em;
+        }
+        
+        .message.ai .message-content ul,
+        .message.ai .message-content ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        
+        .message.ai .message-content li {
+            margin: 4px 0;
+        }
+        
+        .message.ai .message-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 12px 0;
+            font-size: 0.9em;
+        }
+        
+        .message.ai .message-content th,
+        .message.ai .message-content td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        
+        .message.ai .message-content th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        
+        .message.ai .message-content tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .message.ai .message-content p {
+            margin: 8px 0;
+        }
+        
+        .message.ai .message-content strong {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .message.ai .message-content em {
+            font-style: italic;
+            color: #495057;
+        }
+        
+        .message.ai .message-content code {
+            background: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .message.ai .message-content pre {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+        
+        .message.ai .message-content blockquote {
+            border-left: 4px solid #007bff;
+            margin: 8px 0;
+            padding: 8px 16px;
+            background: #f8f9fa;
+            font-style: italic;
+        }
+        
+        .message.user .message-content {
+            background: #007bff;
+            color: white;
+        }
+        
+        .message.ai .message-content {
+            background: white;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .chat-input {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .input-label {
+            min-width: 80px;
+            font-weight: 600;
+            color: #495057;
+            text-align: right;
+        }
+        
+        #urlInput, #datasetInput, #questionInput {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            outline: none;
+            font-size: 16px;
+        }
+        
+        #datasetInput, #questionInput {
+            resize: vertical;
+        }
+        
+        #urlInput:focus, #datasetInput:focus, #questionInput:focus {
+            border-color: #007bff;
+        }
+        
+        #datasetInput {
+            min-height: 60px;
+        }
+        
+        #questionInput {
+            min-height: 40px;
+        }
+        
+        #sendButton, #fetchButton {
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        
+        #fetchButton {
+            background: #28a745;
+        }
+        
+        #sendButton:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        
+        #fetchButton:hover:not(:disabled) {
+            background: #218838;
+        }
+        
+        #sendButton:disabled, #fetchButton:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 10px;
+            color: #6c757d;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        /* Modal styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 500px;
+            position: relative;
+        }
+        
+        .close {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .api-key-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .api-key-info {
+            flex: 1;
+        }
+        
+        .api-key-name {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        
+        .api-key-details {
+            font-size: 12px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="user-info">
+                    <img src="" alt="User" class="user-avatar" id="userAvatar">
+                    <div>
+                        <div id="userName">Loading...</div>
+                        <div style="font-size: 12px; opacity: 0.8;" id="userEmail"></div>
+                    </div>
+                </div>
+                <button class="new-chat-btn" id="newChatBtn">+ New Chat</button>
+            </div>
+            <div class="conversations-search" style="padding: 10px; border-bottom: 1px solid #e9ecef;">
+                <input type="text" id="conversationSearch" placeholder="Search conversations..." 
+                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+            </div>
+            <div id="projectFilesSection" style="padding: 10px; border-bottom: 1px solid #e9ecef; display: none;">
+                <button id="projectFilesBtn" class="new-chat-btn" style="width: 100%; background: #28a745; margin-bottom: 10px;">
+                    📁 Project Files (<span id="projectFilesCount">0</span>)
+                </button>
+                <div id="projectFilesList" style="display: none; max-height: 200px; overflow-y: auto; background: #f8f9fa; border-radius: 4px; padding: 8px;">
+                    <!-- Project files will be displayed here -->
+                </div>
+            </div>
+            <div class="conversations-list" id="conversationsList">
+                <div style="text-align: center; padding: 20px; color: #6c757d;">
+                    Loading conversations...
+                </div>
+            </div>
+            <div class="conversations-footer" style="padding: 10px; border-top: 1px solid #e9ecef; font-size: 12px; color: #6c757d; text-align: center;" id="conversationsCount">
+                <!-- Conversation count will be displayed here -->
+            </div>
+            
+            <div class="admin-section" id="adminSection" style="border-top: 1px solid #e9ecef; padding: 15px; display: none;">
+                <h4 style="margin-bottom: 10px; font-size: 14px; color: #495057;">Administration</h4>
+                <a href="/admin" class="new-chat-btn" style="width: 100%; margin-bottom: 5px; background: #dc3545; text-decoration: none; display: block; text-align: center;">Admin Panel</a>
+                <p style="font-size: 12px; color: #6c757d; margin: 0;">Manage users, API keys, and system settings</p>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="chat-container">
+            <div class="chat-header">
+                <h1>🤖 AI Chat Interface</h1>
+                <div class="model-info">
+                    Connected to: <span id="modelName">gpt-oss:20b</span>
+                    <button onclick="logout()" style="float: right; background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Logout</button>
+                </div>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="message ai">
+                    <div class="message-content">
+                        Hello! I'm your local AI assistant. How can I help you today?
+                    </div>
+                </div>
+            </div>
+            
+            <div class="loading" id="loading">
+                AI is thinking...
+            </div>
+            
+            <div class="chat-input">
+                <div class="input-group">
+                    <div class="input-row">
+                        <label class="input-label">URL:</label>
+                        <input type="url" id="urlInput" placeholder="Enter URL to fetch content (optional)" autocomplete="off">
+                        <button id="fetchButton">Fetch</button>
+                    </div>
+                    <div class="input-row">
+                        <label class="input-label">Dataset:</label>
+                        <textarea id="datasetInput" placeholder="Enter your dataset or data context here..." autocomplete="off"></textarea>
+                    </div>
+                    <div class="input-row">
+                        <label class="input-label">Files:</label>
+                        <div class="file-upload-area">
+                            <input type="file" id="fileInput" multiple accept=".mp3,.wav,.ogg,.m4a,.aac,.flac,.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.txt,.md,.html,.css,.js,.json,.xml,.py,.sql,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.tar,.gz,.rar" style="display: none;">
+                            <button type="button" id="uploadButton" class="upload-btn">📎 Attach Files</button>
+                            <div id="fileList" class="file-list"></div>
+                        </div>
+                    </div>
+                    <div class="input-row">
+                        <label class="input-label">Question:</label>
+                        <textarea id="questionInput" placeholder="Ask a question about the dataset..." autocomplete="off"></textarea>
+                        <button id="sendButton">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Projects Panel -->
+        <div class="projects-panel">
+            <div class="projects-header">
+                <h3 style="margin-bottom: 5px;">📁 Projects</h3>
+                <button class="new-chat-btn" id="newProjectBtn" style="width: 100%; margin-top: 10px;">+ New Project</button>
+            </div>
+            
+            <div id="projectModeIndicator" class="project-mode-indicator" style="display: none;">
+                Project Mode: <span id="currentProjectName"></span>
+                <button id="exitProjectMode" style="margin-left: 10px; padding: 2px 6px; font-size: 10px; background: #dc3545; color: white; border: none; border-radius: 2px;">Exit</button>
+            </div>
+            
+            <div class="projects-search">
+                <input type="text" id="projectSearch" placeholder="Search projects..." 
+                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+            </div>
+            
+            <div class="projects-list" id="projectsList">
+                <div style="text-align: center; padding: 20px; color: #6c757d;">
+                    Loading projects...
+                </div>
+            </div>
+            
+            <div class="conversations-footer" style="padding: 10px; border-top: 1px solid #e9ecef; font-size: 12px; color: #6c757d; text-align: center;" id="projectsCount">
+                <!-- Project count will be displayed here -->
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chatMessages');
+        const urlInput = document.getElementById('urlInput');
+        const datasetInput = document.getElementById('datasetInput');
+        const questionInput = document.getElementById('questionInput');
+        const sendButton = document.getElementById('sendButton');
+        const fetchButton = document.getElementById('fetchButton');
+        const loading = document.getElementById('loading');
+        const conversationsList = document.getElementById('conversationsList');
+        const newChatBtn = document.getElementById('newChatBtn');
+        
+        // Store conversation state
+        let conversationHistory = [];
+        let currentConversationId = null;
+        
+        // Basic text formatting function as fallback
+        function formatBasicText(text) {
+            let formatted = text;
+            
+            // Convert **bold** to <strong>
+            formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // Convert headers (do this before other formatting)
+            formatted = formatted.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            formatted = formatted.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            formatted = formatted.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+            
+            // Convert bullet points
+            formatted = formatted.replace(/^\* (.+)$/gm, '• $1');
+            
+            // Convert line breaks to <br> but preserve paragraph structure
+            formatted = formatted.replace(/\n\n/g, '</p><p>');
+            formatted = formatted.replace(/\n/g, '<br>');
+            
+            // Wrap in paragraphs
+            if (!formatted.includes('<h1>') && !formatted.includes('<h2>') && !formatted.includes('<h3>')) {
+                formatted = '<p>' + formatted + '</p>';
+            }
+            
+            return formatted;
+        }
+        
+        // Projects functionality
+        let allProjects = [];
+        let filteredProjects = [];
+        let currentProjectId = null;
+        let isProjectMode = false;
+
+        // Initialize app
+        window.addEventListener('load', function() {
+            loadConversations();
+            loadUserInfo();
+            loadProjects();
+            
+            // Setup search functionality
+            const searchInput = document.getElementById('conversationSearch');
+            let searchTimeout;
+            
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    searchConversations(this.value);
+                }, 300); // Debounce search for better performance
+            });
+            
+            // Clear search on escape
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    this.value = '';
+                    searchConversations('');
+                }
+            });
+            
+            // Setup projects search
+            const projectSearchInput = document.getElementById('projectSearch');
+            projectSearchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    searchProjects(this.value);
+                }, 300);
+            });
+            
+            // Setup project creation
+            document.getElementById('newProjectBtn').addEventListener('click', createNewProject);
+            document.getElementById('exitProjectMode').addEventListener('click', exitProjectMode);
+            
+            // Debug markdown loading
+            console.log('Marked.js available:', typeof marked !== 'undefined');
+            if (typeof marked !== 'undefined') {
+                console.log('Marked version:', marked.version || 'unknown');
+            }
+            
+            // API key management is now handled in the admin panel
+        });
+        
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/api/user/info');
+                const userInfo = await response.json();
+                
+                document.getElementById('userName').textContent = userInfo.name;
+                document.getElementById('userEmail').textContent = `@${userInfo.username}`;
+                
+                // Show admin section if user is admin
+                const adminSection = document.getElementById('adminSection');
+                if (userInfo.is_admin && userInfo.allowedaccess === 'yes') {
+                    adminSection.style.display = 'block';
+                } else {
+                    adminSection.style.display = 'none';
+                }
+                
+                // Remove the avatar since we don't have Google profile pictures
+                const avatar = document.getElementById('userAvatar');
+                avatar.style.display = 'none';
+                
+            } catch (error) {
+                console.error('Failed to load user info:', error);
+                document.getElementById('userName').textContent = 'User';
+                document.getElementById('userEmail').textContent = '';
+                // Hide admin section on error
+                document.getElementById('adminSection').style.display = 'none';
+            }
+        }
+        
+        function logout() {
+            window.location.href = '/logout';
+        }
+        
+        // API Key Management is now handled in the Admin Panel
+        
+        let allConversations = [];
+        let filteredConversations = [];
+
+        async function loadConversations() {
+            try {
+                const response = await fetch('/api/conversations');
+                const conversations = await response.json();
+                
+                allConversations = conversations;
+                filteredConversations = conversations;
+                
+                displayConversations(conversations);
+                updateConversationCount(conversations.length, conversations.length);
+                
+            } catch (error) {
+                console.error('Failed to load conversations:', error);
+                conversationsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #dc3545;">Failed to load conversations</div>';
+            }
+        }
+
+        function displayConversations(conversations) {
+            conversationsList.innerHTML = '';
+            
+            if (conversations.length === 0) {
+                conversationsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #6c757d;">No conversations found</div>';
+                return;
+            }
+            
+            // Group conversations by date for better organization
+            const groupedConversations = groupConversationsByDate(conversations);
+            
+            Object.keys(groupedConversations).forEach(dateGroup => {
+                // Add date header
+                const dateHeader = document.createElement('div');
+                dateHeader.style.cssText = 'padding: 8px 12px; font-size: 12px; font-weight: 600; color: #6c757d; background: #f8f9fa; margin-bottom: 5px; border-radius: 4px;';
+                dateHeader.textContent = dateGroup;
+                conversationsList.appendChild(dateHeader);
+                
+                // Add conversations for this date
+                groupedConversations[dateGroup].forEach(conversation => {
+                    const item = document.createElement('div');
+                    item.className = 'conversation-item';
+                    item.dataset.conversationId = conversation.id;
+                    
+                    // Make conversation items draggable
+                    item.draggable = true;
+                    item.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', conversation.id);
+                        item.classList.add('dragging');
+                    });
+                    
+                    item.addEventListener('dragend', () => {
+                        item.classList.remove('dragging');
+                    });
+                    
+                    const time = new Date(conversation.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    const createdDate = new Date(conversation.created_at).toLocaleDateString();
+                    const starIcon = conversation.is_starred ? '⭐' : '☆';
+                    const starTitle = conversation.is_starred ? 'Unstar this chat' : 'Star this chat';
+                    
+                    item.innerHTML = `
+                        <div class="conversation-header" style="display: flex; align-items: center; justify-content: space-between;">
+                            <div class="conversation-title" style="flex: 1; cursor: pointer;">${conversation.title}</div>
+                            <div class="conversation-actions" style="display: flex; gap: 5px; opacity: 0.7;">
+                                <button class="star-btn" title="${starTitle}" style="background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px;">${starIcon}</button>
+                                <button class="edit-btn" title="Edit title" style="background: none; border: none; cursor: pointer; font-size: 12px; padding: 2px;">✏️</button>
+                            </div>
+                        </div>
+                        <div class="conversation-date" title="Created: ${createdDate}">${time}</div>
+                    `;
+                    
+                    // Add click handler for the conversation title (not the whole item)
+                    const titleElement = item.querySelector('.conversation-title');
+                    titleElement.addEventListener('click', () => loadConversation(conversation.id));
+                    
+                    // Add star button functionality
+                    const starBtn = item.querySelector('.star-btn');
+                    starBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggleConversationStar(conversation.id);
+                    });
+                    
+                    // Add edit button functionality
+                    const editBtn = item.querySelector('.edit-btn');
+                    editBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        editConversationTitle(conversation.id, conversation.title, titleElement);
+                    });
+                    
+                    conversationsList.appendChild(item);
+                });
+            });
+        }
+
+        function groupConversationsByDate(conversations) {
+            const groups = {};
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            conversations.forEach(conversation => {
+                const date = new Date(conversation.updated_at);
+                let groupKey;
+                
+                if (date.toDateString() === today.toDateString()) {
+                    groupKey = 'Today';
+                } else if (date.toDateString() === yesterday.toDateString()) {
+                    groupKey = 'Yesterday';
+                } else if (date > new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)) {
+                    groupKey = 'This Week';
+                } else if (date > new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)) {
+                    groupKey = 'This Month';
+                } else {
+                    groupKey = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                }
+                
+                if (!groups[groupKey]) {
+                    groups[groupKey] = [];
+                }
+                groups[groupKey].push(conversation);
+            });
+            
+            // Sort conversations within each group by most recent first
+            Object.keys(groups).forEach(key => {
+                groups[key].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+            });
+            
+            return groups;
+        }
+
+        function updateConversationCount(showing, total) {
+            const countElement = document.getElementById('conversationsCount');
+            if (showing === total) {
+                countElement.textContent = `${total} conversation${total !== 1 ? 's' : ''}`;
+            } else {
+                countElement.textContent = `Showing ${showing} of ${total} conversations`;
+            }
+        }
+
+        function searchConversations(query) {
+            if (!query.trim()) {
+                filteredConversations = allConversations;
+            } else {
+                const searchTerm = query.toLowerCase();
+                filteredConversations = allConversations.filter(conversation => 
+                    conversation.title.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            displayConversations(filteredConversations);
+            updateConversationCount(filteredConversations.length, allConversations.length);
+        }
+
+        // Projects Management Functions
+        async function loadProjects() {
+            try {
+                const response = await fetch('/api/projects');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    allProjects = data.projects;
+                    filteredProjects = data.projects;
+                    displayProjects(data.projects);
+                    updateProjectCount(data.projects.length, data.projects.length);
+                } else {
+                    console.error('Failed to load projects:', data.error);
+                    document.getElementById('projectsList').innerHTML = '<div style="text-align: center; padding: 20px; color: #dc3545;">Failed to load projects</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load projects:', error);
+                document.getElementById('projectsList').innerHTML = '<div style="text-align: center; padding: 20px; color: #dc3545;">Failed to load projects</div>';
+            }
+        }
+
+        function displayProjects(projects) {
+            const projectsList = document.getElementById('projectsList');
+            projectsList.innerHTML = '';
+            
+            if (projects.length === 0) {
+                projectsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #6c757d;">No projects found</div>';
+                return;
+            }
+            
+            projects.forEach(project => {
+                const item = document.createElement('div');
+                item.className = 'project-item';
+                item.setAttribute('data-project-id', project.id);
+                
+                if (currentProjectId === project.id) {
+                    item.classList.add('active');
+                }
+                
+                const date = new Date(project.updated_at).toLocaleDateString();
+                const createdDate = new Date(project.created_at).toLocaleDateString();
+                
+                item.innerHTML = `
+                    <div class="project-header" style="display: flex; align-items: center; justify-content: space-between;">
+                        <div class="project-name" style="flex: 1; cursor: pointer;">${project.name}</div>
+                        <div class="project-actions" style="display: flex; gap: 5px; opacity: 0.7;">
+                            <button class="edit-project-btn" title="Edit project name" style="background: none; border: none; cursor: pointer; font-size: 12px; padding: 2px;">✏️</button>
+                        </div>
+                    </div>
+                    <div class="project-info" title="Created: ${createdDate}">
+                        <span>${project.conversation_count} chats</span>
+                        <span>${date}</span>
+                    </div>
+                `;
+                
+                const projectNameElement = item.querySelector('.project-name');
+                projectNameElement.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    enterProjectMode(project.id, project.name);
+                });
+                
+                const editBtn = item.querySelector('.edit-project-btn');
+                editBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    editProjectName(project.id, project.name, projectNameElement);
+                });
+                
+                item.addEventListener('dragover', handleDragOver);
+                item.addEventListener('drop', (e) => handleDrop(e, project.id));
+                item.addEventListener('dragleave', handleDragLeave);
+                
+                projectsList.appendChild(item);
+            });
+        }
+
+        function updateProjectCount(showing, total) {
+            const countElement = document.getElementById('projectsCount');
+            if (showing === total) {
+                countElement.textContent = `${total} project${total !== 1 ? 's' : ''}`;
+            } else {
+                countElement.textContent = `Showing ${showing} of ${total} projects`;
+            }
+        }
+
+        function searchProjects(query) {
+            if (!query.trim()) {
+                filteredProjects = allProjects;
+            } else {
+                const searchTerm = query.toLowerCase();
+                filteredProjects = allProjects.filter(project => 
+                    project.name.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            displayProjects(filteredProjects);
+            updateProjectCount(filteredProjects.length, allProjects.length);
+        }
+
+        async function createNewProject() {
+            const projectName = prompt('Enter project name:');
+            if (!projectName || !projectName.trim()) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/projects', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: projectName.trim() })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    loadProjects(); // Refresh projects list
+                } else {
+                    alert('Error creating project: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Failed to create project:', error);
+                alert('Failed to create project');
+            }
+        }
+
+        function enterProjectMode(projectId, projectName) {
+            // Prevent multiple rapid calls
+            if (currentProjectId === projectId && isProjectMode) {
+                return; // Already in this project mode
+            }
+            
+            currentProjectId = projectId;
+            isProjectMode = true;
+            
+            // Update UI to show project mode
+            const indicator = document.getElementById('projectModeIndicator');
+            const nameSpan = document.getElementById('currentProjectName');
+            
+            if (indicator) indicator.style.display = 'block';
+            if (nameSpan) nameSpan.textContent = projectName;
+            
+            // Update project item styling with better error handling
+            document.querySelectorAll('.project-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            const targetProject = document.querySelector(`[data-project-id="${projectId}"]`);
+            if (targetProject) {
+                targetProject.classList.add('active');
+            }
+            
+            // Load conversations for this project
+            loadProjectConversations(projectId);
+        }
+
+        function exitProjectMode() {
+            currentProjectId = null;
+            isProjectMode = false;
+            
+            // Update UI to hide project mode
+            document.getElementById('projectModeIndicator').style.display = 'none';
+            
+            // Remove active styling from projects
+            document.querySelectorAll('.project-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Load general conversations
+            loadConversations();
+        }
+
+        async function loadProjectConversations(projectId) {
+            try {
+                const response = await fetch(`/api/projects/${projectId}/conversations`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    allConversations = data.conversations;
+                    filteredConversations = data.conversations;
+                    displayConversations(data.conversations);
+                    updateConversationCount(data.conversations.length, data.conversations.length);
+                } else {
+                    console.error('Failed to load project conversations:', data.error);
+                }
+            } catch (error) {
+                console.error('Failed to load project conversations:', error);
+            }
+        }
+
+        // Drag and Drop Functions
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        async function handleDrop(e, projectId) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            
+            const conversationId = e.dataTransfer.getData('text/plain');
+            
+            if (!conversationId) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/conversations/${conversationId}/project`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ project_id: projectId })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Refresh both conversations and projects
+                    loadConversations();
+                    loadProjects();
+                    
+                    // Show success feedback
+                    const projectName = allProjects.find(p => p.id === projectId)?.name || 'Project';
+                    showMessage(`Chat moved to ${projectName}`, 'success');
+                } else {
+                    alert('Error moving chat to project: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Failed to assign conversation to project:', error);
+                alert('Failed to move chat to project');
+            }
+        }
+
+        function showMessage(message, type) {
+            // Create a temporary message element
+            const messageEl = document.createElement('div');
+            messageEl.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                border-radius: 4px;
+                color: white;
+                font-weight: 500;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+            
+            if (type === 'success') {
+                messageEl.style.background = '#28a745';
+            } else {
+                messageEl.style.background = '#dc3545';
+            }
+            
+            messageEl.textContent = message;
+            document.body.appendChild(messageEl);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                messageEl.remove();
+            }, 3000);
+        }
+        
+        // Star/Unstar conversation functionality
+        async function toggleConversationStar(conversationId) {
+            try {
+                const response = await fetch(`/api/conversations/${conversationId}/star`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Refresh conversations to show updated star status
+                    if (currentProjectId) {
+                        loadProjectConversations(currentProjectId);
+                    } else {
+                        loadConversations();
+                    }
+                    
+                    showMessage(data.message, 'success');
+                } else {
+                    showMessage('Error updating star status: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Failed to toggle star:', error);
+                showMessage('Failed to update star status', 'error');
+            }
+        }
+        
+        // Edit conversation title functionality
+        async function editConversationTitle(conversationId, currentTitle, titleElement) {
+            // Create an input field to edit the title
+            const originalHTML = titleElement.innerHTML;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentTitle;
+            input.style.cssText = `
+                width: 100%;
+                padding: 2px 4px;
+                border: 1px solid #007bff;
+                border-radius: 2px;
+                font-size: inherit;
+                font-family: inherit;
+                background: white;
+            `;
+            
+            titleElement.innerHTML = '';
+            titleElement.appendChild(input);
+            input.focus();
+            input.select();
+            
+            // Function to save the title
+            async function saveTitle() {
+                const newTitle = input.value.trim();
+                
+                if (!newTitle) {
+                    showMessage('Title cannot be empty', 'error');
+                    return;
+                }
+                
+                if (newTitle === currentTitle) {
+                    // No change, just restore original
+                    titleElement.innerHTML = originalHTML;
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/conversations/${conversationId}/title`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ title: newTitle })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        // Update the title in the UI
+                        titleElement.innerHTML = newTitle;
+                        
+                        // Refresh conversations to ensure consistency
+                        if (currentProjectId) {
+                            loadProjectConversations(currentProjectId);
+                        } else {
+                            loadConversations();
+                        }
+                        
+                        showMessage('Title updated successfully', 'success');
+                    } else {
+                        titleElement.innerHTML = originalHTML;
+                        showMessage('Error updating title: ' + data.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Failed to update title:', error);
+                    titleElement.innerHTML = originalHTML;
+                    showMessage('Failed to update title', 'error');
+                }
+            }
+            
+            // Function to cancel editing
+            function cancelEdit() {
+                titleElement.innerHTML = originalHTML;
+            }
+            
+            // Save on Enter key
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveTitle();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelEdit();
+                }
+            });
+            
+            // Save on blur (clicking outside)
+            input.addEventListener('blur', saveTitle);
+        }
+        
+        // Edit project name functionality
+        async function editProjectName(projectId, currentName, nameElement) {
+            // Create an input field to edit the project name
+            const originalHTML = nameElement.innerHTML;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentName;
+            input.style.cssText = `
+                width: 100%;
+                padding: 2px 4px;
+                border: 1px solid #007bff;
+                border-radius: 2px;
+                font-size: inherit;
+                font-family: inherit;
+                background: white;
+                font-weight: 600;
+            `;
+            
+            nameElement.innerHTML = '';
+            nameElement.appendChild(input);
+            input.focus();
+            input.select();
+            
+            // Function to save the project name
+            async function saveName() {
+                const newName = input.value.trim();
+                
+                if (!newName) {
+                    showMessage('Project name cannot be empty', 'error');
+                    return;
+                }
+                
+                if (newName === currentName) {
+                    // No change, just restore original
+                    nameElement.innerHTML = originalHTML;
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/projects/${projectId}/name`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ name: newName })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        // Update the name in the UI
+                        nameElement.innerHTML = newName;
+                        
+                        // Refresh projects to ensure consistency
+                        loadProjects();
+                        
+                        // Update project mode indicator if we're in this project
+                        if (currentProjectId === projectId) {
+                            document.getElementById('currentProjectName').textContent = newName;
+                        }
+                        
+                        showMessage('Project name updated successfully', 'success');
+                    } else {
+                        nameElement.innerHTML = originalHTML;
+                        showMessage('Error updating project name: ' + data.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Failed to update project name:', error);
+                    nameElement.innerHTML = originalHTML;
+                    showMessage('Failed to update project name', 'error');
+                }
+            }
+            
+            // Function to cancel editing
+            function cancelEdit() {
+                nameElement.innerHTML = originalHTML;
+            }
+            
+            // Save on Enter key
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveName();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelEdit();
+                }
+            });
+            
+            // Save on blur (clicking outside)
+            input.addEventListener('blur', saveName);
+        }
+        
+        async function loadConversation(conversationId) {
+            try {
+                const response = await fetch(`/api/conversations/${conversationId}`);
+                const conversation = await response.json();
+                
+                // Update UI state
+                currentConversationId = conversationId;
+                document.querySelectorAll('.conversation-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                document.querySelector(`[data-conversation-id="${conversationId}"]`).classList.add('active');
+                
+                // Load dataset
+                datasetInput.value = conversation.dataset || '';
+                
+                // Clear and rebuild chat messages
+                chatMessages.innerHTML = '';
+                conversationHistory = [];
+                
+                // Add welcome message
+                addMessage('Hello! I\'m your local AI assistant. How can I help you today?');
+                
+                // Load conversation messages
+                conversation.messages.forEach(msg => {
+                    if (msg.type === 'user') {
+                        const formatted = `Dataset: ${conversation.dataset || '[No dataset]'}\n\nQuestion: ${msg.question}`;
+                        addMessage(formatted, true, true);
+                        conversationHistory.push({
+                            type: 'user',
+                            dataset: conversation.dataset,
+                            question: msg.question,
+                            formatted: formatted
+                        });
+                    } else {
+                        addMessage(msg.response);
+                        conversationHistory.push({
+                            type: 'ai',
+                            response: msg.response
+                        });
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Failed to load conversation:', error);
+                showError('Failed to load conversation');
+            }
+        }
+        
+        function newChat() {
+            currentConversationId = null;
+            conversationHistory = [];
+            datasetInput.value = '';
+            questionInput.value = '';
+            urlInput.value = '';
+            
+            // Clear active conversation
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Reset chat messages
+            chatMessages.innerHTML = '';
+            addMessage('Hello! I\'m your local AI assistant. How can I help you today?');
+            
+            urlInput.focus();
+        }
+
+        function addMessage(content, isUser = false, isFormatted = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (isFormatted) {
+                // Preserve formatting for dataset/question display
+                contentDiv.style.whiteSpace = 'pre-wrap';
+                contentDiv.textContent = content;
+            } else if (!isUser) {
+                // Format AI responses with markdown or basic formatting
+                if (typeof marked !== 'undefined') {
+                    try {
+                        const htmlContent = marked.parse(content);
+                        contentDiv.innerHTML = htmlContent;
+                    } catch (error) {
+                        console.error('Markdown parsing error:', error);
+                        // Fallback to basic text formatting
+                        contentDiv.innerHTML = formatBasicText(content);
+                    }
+                } else {
+                    console.warn('Marked.js not loaded, using basic formatting');
+                    // Fallback to basic text formatting
+                    contentDiv.innerHTML = formatBasicText(content);
+                }
+            } else {
+                contentDiv.textContent = content;
+            }
+            
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = `Error: ${message}`;
+            chatMessages.appendChild(errorDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function formatUserMessage(dataset, question) {
+            return `Dataset: ${dataset}\n\nQuestion: ${question}`;
+        }
+
+        async function fetchUrlContent() {
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert('Please enter a URL.');
+                return;
+            }
+
+            // Show loading and disable inputs
+            loading.style.display = 'block';
+            fetchButton.disabled = true;
+            urlInput.disabled = true;
+            datasetInput.disabled = true;
+            questionInput.disabled = true;
+            sendButton.disabled = true;
+
+            try {
+                const response = await fetch('/api/fetch-url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Insert the fetched content into the dataset input
+                    datasetInput.value = data.content;
+                    // Clear the URL input
+                    urlInput.value = '';
+                    // Focus on question input
+                    questionInput.focus();
+                } else {
+                    showError(data.error || 'Failed to fetch URL content');
+                }
+            } catch (error) {
+                showError('Failed to fetch URL content');
+                console.error('Error:', error);
+            } finally {
+                // Hide loading and re-enable inputs
+                loading.style.display = 'none';
+                fetchButton.disabled = false;
+                urlInput.disabled = false;
+                datasetInput.disabled = false;
+                questionInput.disabled = false;
+                sendButton.disabled = false;
+            }
+        }
+
+        async function sendMessage() {
+            const dataset = datasetInput.value.trim();
+            const question = questionInput.value.trim();
+            
+            if (!dataset && !question) return;
+            if (!question) {
+                alert('Please enter a question.');
+                return;
+            }
+
+            // Format the current message
+            const currentMessage = formatUserMessage(dataset || '[No dataset provided]', question);
+            
+            // Add user message to display
+            addMessage(currentMessage, true, true);
+            
+            // Store in conversation history
+            conversationHistory.push({
+                type: 'user',
+                dataset: dataset,
+                question: question,
+                formatted: currentMessage
+            });
+            
+            // Clear question input (keep dataset for next question)
+            questionInput.value = '';
+            
+            // Show loading and disable inputs
+            loading.style.display = 'block';
+            sendButton.disabled = true;
+            datasetInput.disabled = true;
+            questionInput.disabled = true;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        dataset: dataset,
+                        question: question,
+                        history: conversationHistory,
+                        conversation_id: currentConversationId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    addMessage(data.response);
+                    // Store AI response in history
+                    conversationHistory.push({
+                        type: 'ai',
+                        response: data.response
+                    });
+                    
+                    // Update current conversation ID if this was a new conversation
+                    if (data.conversation_id && !currentConversationId) {
+                        currentConversationId = data.conversation_id;
+                        loadConversations(); // Refresh sidebar
+                    }
+                } else {
+                    showError(data.error || 'Unknown error occurred');
+                }
+            } catch (error) {
+                showError('Failed to connect to AI service');
+                console.error('Error:', error);
+            } finally {
+                // Hide loading and re-enable inputs
+                loading.style.display = 'none';
+                sendButton.disabled = false;
+                datasetInput.disabled = false;
+                questionInput.disabled = false;
+                questionInput.focus();
+            }
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        fetchButton.addEventListener('click', fetchUrlContent);
+        newChatBtn.addEventListener('click', newChat);
+        
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                fetchUrlContent();
+            }
+        });
+        
+        questionInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        datasetInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                questionInput.focus();
+            }
+        });
+
+        // Focus URL input on load
+        urlInput.focus();
+        
+        // File Upload Functionality
+        let currentConversationFiles = [];
+        
+        // File type icons mapping
+        const fileTypeIcons = {
+            'audio': '🎵',
+            'image': '🖼️',
+            'text': '📄',
+            'document': '📋',
+            'archive': '📦',
+            'other': '📎'
+        };
+        
+        // Initialize file upload functionality
+        const uploadButton = document.getElementById('uploadButton');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        
+        // Upload button click handler
+        uploadButton.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        // File input change handler
+        fileInput.addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                uploadFiles(files);
+            }
+        });
+        
+        // Drag and drop functionality
+        const fileUploadArea = document.querySelector('.file-upload-area');
+        
+        fileUploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            fileUploadArea.style.backgroundColor = '#f0f8ff';
+        });
+        
+        fileUploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            fileUploadArea.style.backgroundColor = '';
+        });
+        
+        fileUploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            fileUploadArea.style.backgroundColor = '';
+            
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) {
+                uploadFiles(files);
+            }
+        });
+        
+        async function uploadFiles(files) {
+            if (!currentConversationId) {
+                showMessage('Please start a conversation first', 'error');
+                return;
+            }
+            
+            for (const file of files) {
+                await uploadSingleFile(file);
+            }
+            
+            // Clear file input
+            fileInput.value = '';
+        }
+        
+        async function uploadSingleFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch(`/api/conversations/${currentConversationId}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Add file to current conversation files
+                    currentConversationFiles.push(data.file);
+                    
+                    // Update file list display
+                    displayFiles();
+                    
+                    showMessage(`File "${data.file.original_filename}" uploaded successfully`, 'success');
+                } else {
+                    showMessage(`Failed to upload "${file.name}": ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                showMessage(`Failed to upload "${file.name}": ${error.message}`, 'error');
+            }
+        }
+        
+        async function loadConversationFiles(conversationId) {
+            if (!conversationId) {
+                currentConversationFiles = [];
+                displayFiles();
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/conversations/${conversationId}/files`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentConversationFiles = data.files || [];
+                    displayFiles();
+                } else {
+                    console.error('Failed to load files:', data.error);
+                    currentConversationFiles = [];
+                    displayFiles();
+                }
+            } catch (error) {
+                console.error('Failed to load files:', error);
+                currentConversationFiles = [];
+                displayFiles();
+            }
+        }
+        
+        function displayFiles() {
+            if (currentConversationFiles.length === 0) {
+                fileList.innerHTML = '';
+                return;
+            }
+            
+            fileList.innerHTML = currentConversationFiles.map(file => {
+                const icon = fileTypeIcons[file.file_type] || fileTypeIcons.other;
+                const isImportant = file.is_project_important;
+                const projectToggleIcon = isImportant ? '⭐' : '☆';
+                const projectToggleClass = isImportant ? 'project-toggle important' : 'project-toggle';
+                const projectToggleTitle = isImportant ? 'Remove from project important files' : 'Mark as project important';
+                
+                return `
+                    <div class="file-item ${file.file_type}" data-file-id="${file.id}">
+                        <div class="file-info">
+                            <div class="file-icon">${icon}</div>
+                            <div class="file-details">
+                                <div class="file-name">${file.original_filename}</div>
+                                <div class="file-meta">${file.file_size_formatted} • ${file.file_type} • ${new Date(file.upload_date).toLocaleDateString()}</div>
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="file-action-btn ${projectToggleClass}" onclick="toggleFileProjectImportance(${file.id})" title="${projectToggleTitle}">
+                                ${projectToggleIcon}
+                            </button>
+                            <button class="file-action-btn download" onclick="downloadFile(${file.id})" title="Download">
+                                ⬇️
+                            </button>
+                            <button class="file-action-btn delete" onclick="deleteFile(${file.id})" title="Delete">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function downloadFile(fileId) {
+            try {
+                const response = await fetch(`/api/files/${fileId}/download`);
+                
+                if (response.ok) {
+                    // Create a temporary link to trigger download
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = ''; // Filename will be set by server
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const data = await response.json();
+                    showMessage(`Failed to download file: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Download error:', error);
+                showMessage(`Failed to download file: ${error.message}`, 'error');
+            }
+        }
+        
+        async function deleteFile(fileId) {
+            if (!confirm('Are you sure you want to delete this file?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/files/${fileId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Remove file from current list
+                    currentConversationFiles = currentConversationFiles.filter(f => f.id !== fileId);
+                    
+                    // Update display
+                    displayFiles();
+                    
+                    showMessage('File deleted successfully', 'success');
+                } else {
+                    showMessage(`Failed to delete file: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                showMessage(`Failed to delete file: ${error.message}`, 'error');
+            }
+        }
+        
+        // Override loadConversation to also load files
+        const originalLoadConversation = loadConversation;
+        loadConversation = async function(conversationId) {
+            await originalLoadConversation(conversationId);
+            await loadConversationFiles(conversationId);
+        };
+        
+        // Override newChat to clear files
+        const originalNewChat = newChat;
+        newChat = function() {
+            originalNewChat();
+            currentConversationFiles = [];
+            displayFiles();
+        };
+        
+        // Project Files Management
+        let currentProjectFiles = [];
+        // Note: currentProjectId is already declared earlier in the script
+        
+        // Initialize project files functionality
+        const projectFilesBtn = document.getElementById('projectFilesBtn');
+        const projectFilesList = document.getElementById('projectFilesList');
+        const projectFilesSection = document.getElementById('projectFilesSection');
+        
+        projectFilesBtn.addEventListener('click', function() {
+            if (projectFilesList.style.display === 'none') {
+                projectFilesList.style.display = 'block';
+                loadProjectFiles(currentProjectId);
+            } else {
+                projectFilesList.style.display = 'none';
+            }
+        });
+        
+        async function toggleFileProjectImportance(fileId) {
+            try {
+                const response = await fetch(`/api/files/${fileId}/toggle-project-important`, {
+                    method: 'PUT'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Update the file in current conversation files
+                    const fileIndex = currentConversationFiles.findIndex(f => f.id === fileId);
+                    if (fileIndex !== -1) {
+                        currentConversationFiles[fileIndex].is_project_important = data.is_project_important;
+                        displayFiles();
+                    }
+                    
+                    // Refresh project files if we're in project mode
+                    if (currentProjectId) {
+                        loadProjectFiles(currentProjectId);
+                    }
+                    
+                    showMessage(data.message, 'success');
+                } else {
+                    showMessage(`Failed to toggle file importance: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Toggle importance error:', error);
+                showMessage(`Failed to toggle file importance: ${error.message}`, 'error');
+            }
+        }
+        
+        async function loadProjectFiles(projectId) {
+            if (!projectId) {
+                projectFilesList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 10px;">No project selected</div>';
+                document.getElementById('projectFilesCount').textContent = '0';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/projects/${projectId}/important-files`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentProjectFiles = data.files || [];
+                    displayProjectFiles();
+                    document.getElementById('projectFilesCount').textContent = currentProjectFiles.length;
+                } else {
+                    console.error('Failed to load project files:', data.error);
+                    projectFilesList.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 10px;">Failed to load files</div>';
+                    document.getElementById('projectFilesCount').textContent = '0';
+                }
+            } catch (error) {
+                console.error('Failed to load project files:', error);
+                projectFilesList.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 10px;">Error loading files</div>';
+                document.getElementById('projectFilesCount').textContent = '0';
+            }
+        }
+        
+        function displayProjectFiles() {
+            if (currentProjectFiles.length === 0) {
+                projectFilesList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 10px;">No important files in this project</div>';
+                return;
+            }
+            
+            projectFilesList.innerHTML = currentProjectFiles.map(file => {
+                const icon = fileTypeIcons[file.file_type] || fileTypeIcons.other;
+                
+                return `
+                    <div class="project-file-item" data-file-id="${file.id}">
+                        <div class="project-file-info">
+                            <div class="file-icon">${icon}</div>
+                            <div>
+                                <div class="project-file-name">${file.original_filename}</div>
+                                <div class="project-file-meta">${file.file_size_formatted} • ${file.conversation_title}</div>
+                            </div>
+                        </div>
+                        <div class="project-file-actions">
+                            <button class="file-action-btn download" onclick="downloadFile(${file.id})" title="Download">
+                                ⬇️
+                            </button>
+                            <button class="file-action-btn" onclick="openConversationWithFile(${file.conversation_id})" title="Go to conversation">
+                                💬
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function openConversationWithFile(conversationId) {
+            // Load the conversation that contains this file
+            await loadConversation(conversationId);
+            
+            // Hide project files list
+            projectFilesList.style.display = 'none';
+            
+            showMessage('Opened conversation containing the file', 'success');
+        }
+        
+        // Update project switching to show/hide project files section
+        function updateProjectFilesVisibility() {
+            if (currentProjectId) {
+                projectFilesSection.style.display = 'block';
+                loadProjectFiles(currentProjectId);
+            } else {
+                projectFilesSection.style.display = 'none';
+                currentProjectFiles = [];
+                document.getElementById('projectFilesCount').textContent = '0';
+            }
+        }
+        
+        // Override project switching to update files visibility
+        const originalSwitchToProject = window.switchToProject;
+        if (originalSwitchToProject) {
+            window.switchToProject = function(projectId, projectName) {
+                currentProjectId = projectId;
+                originalSwitchToProject(projectId, projectName);
+                updateProjectFilesVisibility();
+            };
+        }
+        
+        // Override general mode switching
+        const originalSwitchToGeneralMode = window.switchToGeneralMode;
+        if (originalSwitchToGeneralMode) {
+            window.switchToGeneralMode = function() {
+                currentProjectId = null;
+                originalSwitchToGeneralMode();
+                updateProjectFilesVisibility();
+            };
+        }
+    </script>
+</body>
+</html>

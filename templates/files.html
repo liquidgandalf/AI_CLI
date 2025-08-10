@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Files - AI Chat Interface</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+    <style>
+        .files-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .files-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #333;
+        }
+        
+        .files-header h1 {
+            color: #fff;
+            margin: 0;
+        }
+        
+        .files-stats {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        
+        .files-table {
+            background: #2a2a2a;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .files-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .files-table th {
+            background: #333;
+            color: #fff;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 1px solid #444;
+        }
+        
+        .files-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #333;
+            color: #ddd;
+        }
+        
+        .files-table tr:hover {
+            background: #333;
+        }
+        
+        .file-icon {
+            font-size: 1.2em;
+            margin-right: 8px;
+        }
+        
+        .file-name {
+            display: flex;
+            align-items: center;
+        }
+        
+        .processing-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+        
+        .status-unprocessed {
+            background: #444;
+            color: #aaa;
+        }
+        
+        .status-processing {
+            background: #ffa500;
+            color: #000;
+        }
+        
+        .status-processed {
+            background: #28a745;
+            color: #fff;
+        }
+        
+        .status-do-not-process {
+            background: #6c757d;
+            color: #fff;
+        }
+        
+        .details-btn {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s;
+        }
+        
+        .details-btn:hover {
+            background: #0056b3;
+        }
+        
+        .project-link, .conversation-link {
+            color: #007bff;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+        
+        .project-link:hover, .conversation-link:hover {
+            text-decoration: underline;
+        }
+        
+        .no-files {
+            text-align: center;
+            padding: 40px;
+            color: #aaa;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #aaa;
+        }
+        
+        .nav-links {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .nav-links a {
+            color: #007bff;
+            text-decoration: none;
+            margin-right: 20px;
+            padding: 8px 12px;
+            background: #333;
+            border-radius: 4px;
+            display: inline-block;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background: #007bff;
+            color: #fff;
+            text-decoration: none;
+        }
+        
+        .worker-status {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .worker-status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .worker-status-title {
+            color: #fff;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .worker-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        
+        .status-running {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-stopped {
+            background: #dc3545;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .queue-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .queue-stat {
+            text-align: center;
+            padding: 8px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        
+        .queue-stat-number {
+            display: block;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .queue-stat-label {
+            display: block;
+            font-size: 0.8em;
+            color: #aaa;
+            margin-top: 4px;
+        }
+        
+        .worker-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .worker-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s;
+        }
+        
+        .worker-btn-start {
+            background: #28a745;
+            color: #fff;
+        }
+        
+        .worker-btn-start:hover {
+            background: #1e7e34;
+        }
+        
+        .worker-btn-refresh {
+            background: #007bff;
+            color: #fff;
+        }
+        
+        .worker-btn-refresh:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="files-container">
+        <div class="nav-links">
+            <a href="/chat">← Back to Chat</a>
+            <a href="/user">User Dashboard</a>
+            <a href="/admin">Admin Users</a>
+        </div>
+        
+        <div class="files-header">
+            <h1>My Files</h1>
+            <div class="files-stats" id="filesStats">
+                Loading...
+            </div>
+        </div>
+        
+        <div class="worker-status" id="workerStatus">
+            <div class="loading">
+                Checking worker status...
+            </div>
+        </div>
+        
+        <div class="files-table" id="filesTable">
+            <div class="loading">
+                Loading files...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileTypeIcons = {
+            'audio': '🎵',
+            'image': '🖼️',
+            'text': '📄',
+            'document': '📋',
+            'archive': '📦',
+            'other': '📎'
+        };
+
+        function getProcessingStatusDisplay(status) {
+            switch (status) {
+                case 0: return 'Unprocessed';
+                case 1: return 'Processing...';
+                case 2: return 'Processed';
+                case 4: return 'Do Not Process';
+                default: return 'Unknown';
+            }
+        }
+
+        function getProcessingStatusClass(status) {
+            switch (status) {
+                case 0: return 'status-unprocessed';
+                case 1: return 'status-processing';
+                case 2: return 'status-processed';
+                case 4: return 'status-do-not-process';
+                default: return 'status-unknown';
+            }
+        }
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
+        }
+
+        function viewFileDetails(fileId) {
+            window.location.href = `/files/${fileId}`;
+        }
+
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load files');
+                }
+                
+                displayFiles(data.files);
+                updateStats(data.count);
+                
+            } catch (error) {
+                console.error('Error loading files:', error);
+                document.getElementById('filesTable').innerHTML = `
+                    <div class="no-files">
+                        Error loading files: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function displayFiles(files) {
+            const filesTable = document.getElementById('filesTable');
+            
+            if (files.length === 0) {
+                filesTable.innerHTML = `
+                    <div class="no-files">
+                        No files uploaded yet. <a href="/chat">Upload some files</a> to get started!
+                    </div>
+                `;
+                return;
+            }
+            
+            const tableHtml = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Type</th>
+                            <th>Size</th>
+                            <th>Chat/Project</th>
+                            <th>Status</th>
+                            <th>Uploaded</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${files.map(file => `
+                            <tr>
+                                <td>
+                                    <div class="file-name">
+                                        <span class="file-icon">${fileTypeIcons[file.file_type] || fileTypeIcons.other}</span>
+                                        ${file.original_filename}
+                                    </div>
+                                </td>
+                                <td>${file.file_type}</td>
+                                <td>${file.file_size_formatted}</td>
+                                <td>
+                                    <a href="/chat?conversation=${file.conversation.id}" class="conversation-link">
+                                        ${file.conversation.title}
+                                    </a>
+                                    ${file.project ? `<br><a href="/chat?project=${file.project.id}" class="project-link">${file.project.name}</a>` : ''}
+                                </td>
+                                <td>
+                                    <span class="processing-status ${getProcessingStatusClass(file.has_been_processed)}">
+                                        ${getProcessingStatusDisplay(file.has_been_processed)}
+                                    </span>
+                                </td>
+                                <td>${formatDate(file.upload_date)}</td>
+                                <td>
+                                    <button class="details-btn" onclick="viewFileDetails(${file.id})">
+                                        Details
+                                    </button>
+                                    ${file.has_been_processed === 0 || file.has_been_processed === 1 ? `
+                                        <button class="details-btn" style="background: #6c757d; margin-left: 5px;" onclick="markDoNotProcess(${file.id})" title="Mark as Do Not Process">
+                                            🚫
+                                        </button>
+                                    ` : ''}
+                                    ${file.has_been_processed === 4 ? `
+                                        <button class="details-btn" style="background: #28a745; margin-left: 5px;" onclick="markForProcessing(${file.id})" title="Mark for Processing">
+                                            ✅
+                                        </button>
+                                    ` : ''}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            filesTable.innerHTML = tableHtml;
+        }
+
+        function updateStats(count) {
+            const statsElement = document.getElementById('filesStats');
+            statsElement.textContent = `${count} file${count !== 1 ? 's' : ''} total`;
+        }
+
+        async function loadWorkerStatus() {
+            try {
+                const response = await fetch('/api/worker/status');
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load worker status');
+                }
+                
+                displayWorkerStatus(data);
+                
+            } catch (error) {
+                console.error('Error loading worker status:', error);
+                document.getElementById('workerStatus').innerHTML = `
+                    <div class="worker-status-header">
+                        <h3 class="worker-status-title">🔧 Background Worker</h3>
+                        <div class="worker-indicator">
+                            <span class="status-dot status-stopped"></span>
+                            <span style="color: #dc3545;">Status Unknown</span>
+                        </div>
+                    </div>
+                    <p style="color: #aaa; margin: 0;">Unable to check worker status</p>
+                `;
+            }
+        }
+
+        function displayWorkerStatus(status) {
+            const workerStatus = document.getElementById('workerStatus');
+            const isRunning = status.worker_running;
+            const stats = status.queue_stats;
+            
+            const statusHtml = `
+                <div class="worker-status-header">
+                    <h3 class="worker-status-title">🔧 Background Worker</h3>
+                    <div class="worker-indicator">
+                        <span class="status-dot ${isRunning ? 'status-running' : 'status-stopped'}"></span>
+                        <span style="color: ${isRunning ? '#28a745' : '#dc3545'};">
+                            ${isRunning ? 'Running' : 'Stopped'}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="queue-stats">
+                    <div class="queue-stat">
+                        <span class="queue-stat-number">${stats.unprocessed}</span>
+                        <span class="queue-stat-label">Unprocessed</span>
+                    </div>
+                    <div class="queue-stat">
+                        <span class="queue-stat-number">${stats.processing}</span>
+                        <span class="queue-stat-label">Processing</span>
+                    </div>
+                    <div class="queue-stat">
+                        <span class="queue-stat-number">${stats.processed}</span>
+                        <span class="queue-stat-label">Processed</span>
+                    </div>
+                    <div class="queue-stat">
+                        <span class="queue-stat-number">${stats.total}</span>
+                        <span class="queue-stat-label">Total Files</span>
+                    </div>
+                </div>
+                
+                <div class="worker-actions">
+                    <button class="worker-btn worker-btn-refresh" onclick="refreshStatus()">
+                        🔄 Refresh Status
+                    </button>
+                    ${!isRunning && stats.unprocessed > 0 ? `
+                        <button class="worker-btn worker-btn-start" onclick="showWorkerInstructions()">
+                            ▶️ Start Worker
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+            
+            workerStatus.innerHTML = statusHtml;
+        }
+
+        function refreshStatus() {
+            loadWorkerStatus();
+            loadFiles();
+        }
+
+        function showWorkerInstructions() {
+            alert(`To start the background worker, run this command in your terminal:
+
+cd /home/derek/AI_CLI
+source venv/bin/activate
+python process_unprocessed_files.py --loop
+
+The worker will then process files automatically in the background.`);
+        }
+
+        async function markDoNotProcess(fileId) {
+            if (!confirm('Mark this file as "Do Not Process"? This will prevent the background worker from processing it.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/files/${fileId}/processing`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        has_been_processed: 4
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to update file status');
+                }
+
+                // Refresh the files list to show the updated status
+                loadFiles();
+                
+                alert('File marked as "Do Not Process"');
+
+            } catch (error) {
+                console.error('Error marking file as do not process:', error);
+                alert('Failed to update file status: ' + error.message);
+            }
+        }
+
+        async function markForProcessing(fileId) {
+            if (!confirm('Mark this file for processing? This will allow the background worker to process it again.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/files/${fileId}/processing`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        has_been_processed: 0
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to update file status');
+                }
+
+                // Refresh the files list to show the updated status
+                loadFiles();
+                
+                alert('File marked for processing');
+
+            } catch (error) {
+                console.error('Error marking file for processing:', error);
+                alert('Failed to update file status: ' + error.message);
+            }
+        }
+
+        // Load files and worker status when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFiles();
+            loadWorkerStatus();
+            
+            // Auto-refresh worker status every 30 seconds
+            setInterval(loadWorkerStatus, 30000);
+        });
+    </script>
+</body>
+</html>

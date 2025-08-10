@@ -1,0 +1,26 @@
+[Unit]
+Description=AI Chat Interface with Background Worker
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=derek
+Group=derek
+WorkingDirectory=/home/derek/AI_CLI
+ExecStart=/home/derek/AI_CLI/start-daemon.sh
+ExecStop=/bin/kill -TERM $MAINPID
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment=PATH=/home/derek/AI_CLI/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=/home/derek/AI_CLI
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

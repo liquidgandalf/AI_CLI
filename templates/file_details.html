@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Details - AI Chat Interface</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+    <style>
+        .file-details-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .file-header {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .file-title {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .file-icon {
+            font-size: 2em;
+            margin-right: 15px;
+        }
+        
+        .file-title h1 {
+            color: #fff;
+            margin: 0;
+            font-size: 1.5em;
+        }
+        
+        .file-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .meta-item {
+            color: #ddd;
+        }
+        
+        .meta-label {
+            font-weight: 600;
+            color: #aaa;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .processing-status {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: 500;
+            display: inline-block;
+        }
+        
+        .status-unprocessed {
+            background: #444;
+            color: #aaa;
+        }
+        
+        .status-processing {
+            background: #ffa500;
+            color: #000;
+        }
+        
+        .status-processed {
+            background: #28a745;
+            color: #fff;
+        }
+        
+        .content-section {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .section-title {
+            color: #fff;
+            margin: 0 0 15px 0;
+            font-size: 1.2em;
+            border-bottom: 1px solid #444;
+            padding-bottom: 8px;
+        }
+        
+        .transcribed-content, .summary-content {
+            background: #1a1a1a;
+            border-radius: 4px;
+            padding: 15px;
+            color: #ddd;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 1px solid #333;
+        }
+        
+        .human-notes {
+            background: #1a1a1a;
+            border-radius: 4px;
+            padding: 15px;
+            color: #ddd;
+            border: 1px solid #333;
+            min-height: 100px;
+            width: 100%;
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: #fff;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: #fff;
+        }
+        
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: #fff;
+        }
+        
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+        
+        .nav-links {
+            margin-bottom: 20px;
+        }
+        
+        .nav-links a {
+            color: #007bff;
+            text-decoration: none;
+            margin-right: 15px;
+        }
+        
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #aaa;
+        }
+        
+        .error {
+            background: #dc3545;
+            color: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        .success {
+            background: #28a745;
+            color: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        .association-links a {
+            color: #007bff;
+            text-decoration: none;
+            margin-right: 10px;
+        }
+        
+        .association-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="file-details-container">
+        <div class="nav-links">
+            <a href="/files">← Back to Files</a>
+            <a href="/chat">Chat</a>
+            <a href="/user">User Dashboard</a>
+        </div>
+        
+        <div id="fileContent">
+            <div class="loading">
+                Loading file details...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileId = "{{ file_id }}";
+        
+        const fileTypeIcons = {
+            'audio': '🎵',
+            'image': '🖼️',
+            'text': '📄',
+            'document': '📋',
+            'archive': '📦',
+            'other': '📎'
+        };
+
+        function getProcessingStatusDisplay(status) {
+            switch (status) {
+                case 0: return 'Unprocessed';
+                case 1: return 'Processing...';
+                case 2: return 'Processed';
+                case 4: return 'Do Not Process';
+                default: return 'Unknown';
+            }
+        }
+
+        function getProcessingStatusClass(status) {
+            switch (status) {
+                case 0: return 'status-unprocessed';
+                case 1: return 'status-processing';
+                case 2: return 'status-processed';
+                case 4: return 'status-do-not-process';
+                default: return 'status-unknown';
+            }
+        }
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
+        }
+
+        function showMessage(message, type = 'success') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            
+            const container = document.querySelector('.file-details-container');
+            container.insertBefore(messageDiv, container.firstChild.nextSibling);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+
+        async function loadFileDetails() {
+            try {
+                const response = await fetch(`/api/files/${fileId}/details`);
+                const file = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(file.error || 'Failed to load file details');
+                }
+                
+                displayFileDetails(file);
+                
+            } catch (error) {
+                console.error('Error loading file details:', error);
+                document.getElementById('fileContent').innerHTML = `
+                    <div class="error">
+                        Error loading file details: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function displayFileDetails(file) {
+            const icon = fileTypeIcons[file.file_type] || fileTypeIcons.other;
+            const statusDisplay = getProcessingStatusDisplay(file.has_been_processed);
+            const statusClass = getProcessingStatusClass(file.has_been_processed);
+            
+            let content = `
+                <div class="file-header">
+                    <div class="file-title">
+                        <span class="file-icon">${icon}</span>
+                        <h1>${file.original_filename}</h1>
+                    </div>
+                    
+                    <div class="file-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">File Type:</span>
+                            ${file.file_type} (${file.mime_type})
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">File Size:</span>
+                            ${file.file_size_formatted}
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Uploaded:</span>
+                            ${formatDate(file.upload_date)}
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Processing Status:</span>
+                            <span class="processing-status ${statusClass}">${statusDisplay}</span>
+                        </div>
+                        ${file.date_processed ? `
+                        <div class="meta-item">
+                            <span class="meta-label">Processed:</span>
+                            ${formatDate(file.date_processed)}
+                        </div>
+                        ` : ''}
+                        ${file.time_to_process ? `
+                        <div class="meta-item">
+                            <span class="meta-label">Processing Time:</span>
+                            ${file.time_to_process.toFixed(2)} seconds
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                <div class="content-section">
+                    <h2 class="section-title">Associations</h2>
+                    <div class="association-links">
+                        <a href="/chat?conversation=${file.conversation.id}">📝 ${file.conversation.title}</a>
+                        ${file.project ? `<a href="/chat?project=${file.project.id}">📁 ${file.project.name}</a>` : ''}
+                        <a href="/api/files/${file.id}/download" download>⬇️ Download File</a>
+                    </div>
+                </div>
+            `;
+            
+            // Add transcribed content if available
+            if (file.transcoded_raw_file) {
+                content += `
+                    <div class="content-section">
+                        <h2 class="section-title">Transcribed Content</h2>
+                        <div class="transcribed-content">${file.transcoded_raw_file}</div>
+                    </div>
+                `;
+            }
+            
+            // Add summary if available
+            if (file.summary_raw_file) {
+                content += `
+                    <div class="content-section">
+                        <h2 class="section-title">Summary</h2>
+                        <div class="summary-content">${file.summary_raw_file}</div>
+                    </div>
+                `;
+            }
+            
+            // Add human notes section
+            content += `
+                <div class="content-section">
+                    <h2 class="section-title">Notes</h2>
+                    <textarea class="human-notes" id="humanNotesInput" placeholder="Add your notes about this file...">${file.human_notes || ''}</textarea>
+                    <div class="actions">
+                        <button class="btn btn-primary" onclick="updateNotes()">Save Notes</button>
+                        ${file.has_been_processed !== 1 ? `<button class="btn btn-secondary" onclick="reprocessFile()">Reprocess File</button>` : ''}
+                        <button class="btn btn-success" onclick="downloadFile()">Download File</button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('fileContent').innerHTML = content;
+        }
+
+        async function updateNotes() {
+            const notesInput = document.getElementById('humanNotesInput');
+            const notes = notesInput.value.trim();
+            
+            try {
+                const response = await fetch(`/api/files/${fileId}/processing`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ human_notes: notes })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Notes saved successfully', 'success');
+                } else {
+                    showMessage(`Failed to save notes: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Update notes error:', error);
+                showMessage(`Failed to save notes: ${error.message}`, 'error');
+            }
+        }
+
+        async function reprocessFile() {
+            if (!confirm('Are you sure you want to reprocess this file? This will reset its processing status and queue it for processing again.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/files/${fileId}/reprocess`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('File queued for reprocessing', 'success');
+                    // Reload the page to show updated status
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    showMessage(`Failed to reprocess file: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Reprocess file error:', error);
+                showMessage(`Failed to reprocess file: ${error.message}`, 'error');
+            }
+        }
+
+        function downloadFile() {
+            window.open(`/api/files/${fileId}/download`, '_blank');
+        }
+
+        // Load file details when page loads
+        document.addEventListener('DOMContentLoaded', loadFileDetails);
+    </script>
+</body>
+</html>
