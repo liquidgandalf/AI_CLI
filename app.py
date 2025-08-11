@@ -2233,6 +2233,91 @@ def api_create_project():
     finally:
         db.close()
 
+@app.route('/api/v1/conversations/<int:conversation_id>/files', methods=['GET'])
+@api_key_required
+def api_get_conversation_files(conversation_id):
+    """Get files for a specific conversation (API key auth)"""
+    db = get_db()
+    try:
+        # Check if conversation belongs to API key user
+        conversation = db.query(Conversation).filter(
+            Conversation.id == conversation_id,
+            Conversation.user_id == request.api_user.id
+        ).first()
+        
+        if not conversation:
+            return jsonify({'error': 'Conversation not found or access denied'}), 404
+        
+        # Get files for this conversation
+        files = db.query(ChatFile).filter(
+            ChatFile.conversation_id == conversation_id
+        ).order_by(ChatFile.upload_date.desc()).all()
+        
+        files_data = []
+        for file_obj in files:
+            files_data.append({
+                'id': file_obj.id,
+                'original_filename': file_obj.original_filename,
+                'system_filename': file_obj.system_filename,
+                'file_type': file_obj.file_type,
+                'mime_type': file_obj.mime_type,
+                'file_size': file_obj.file_size,
+                'upload_date': file_obj.upload_date.isoformat(),
+                'has_been_processed': file_obj.has_been_processed,
+                'date_processed': file_obj.date_processed.isoformat() if file_obj.date_processed else None,
+                'time_to_process': file_obj.time_to_process,
+                'is_project_important': file_obj.is_project_important
+            })
+        
+        return jsonify({'files': files_data})
+    finally:
+        db.close()
+
+@app.route('/api/v1/files/<int:file_id>/details', methods=['GET'])
+@api_key_required
+def api_get_file_details(file_id):
+    """Get detailed information about a specific file (API key auth)"""
+    db = get_db()
+    try:
+        # Get the file and verify ownership through conversation
+        file_obj = db.query(ChatFile).join(Conversation).filter(
+            ChatFile.id == file_id,
+            Conversation.user_id == request.api_user.id
+        ).first()
+        
+        if not file_obj:
+            return jsonify({'error': 'File not found or access denied'}), 404
+        
+        conversation = file_obj.conversation
+        
+        file_data = {
+            'id': file_obj.id,
+            'original_filename': file_obj.original_filename,
+            'system_filename': file_obj.system_filename,
+            'file_path': file_obj.file_path,
+            'file_type': file_obj.file_type,
+            'mime_type': file_obj.mime_type,
+            'file_size': file_obj.file_size,
+            'upload_date': file_obj.upload_date.isoformat(),
+            'has_been_processed': file_obj.has_been_processed,
+            'transcoded_raw_file': file_obj.transcoded_raw_file,
+            'summary_raw_file': file_obj.summary_raw_file,
+            'human_notes': file_obj.human_notes,
+            'date_processed': file_obj.date_processed.isoformat() if file_obj.date_processed else None,
+            'time_to_process': file_obj.time_to_process,
+            'is_project_important': file_obj.is_project_important,
+            'conversation': {
+                'id': conversation.id,
+                'title': conversation.title,
+                'created_at': conversation.created_at.isoformat(),
+                'updated_at': conversation.updated_at.isoformat()
+            }
+        }
+        
+        return jsonify(file_data)
+    finally:
+        db.close()
+
 # Archive Management API Endpoints - Three Level System
 # Level 1: Active (is_archived=False, is_hidden=False) - Front page
 # Level 2: Hidden (is_archived=False, is_hidden=True) - User page only

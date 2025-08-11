@@ -99,6 +99,11 @@
             color: #fff;
         }
         
+        .status-unknown {
+            background: #dc3545;
+            color: #fff;
+        }
+        
         .details-btn {
             background: #007bff;
             color: #fff;
@@ -377,6 +382,7 @@
                 <table>
                     <thead>
                         <tr>
+                            <th>File ID</th>
                             <th>File</th>
                             <th>Type</th>
                             <th>Size</th>
@@ -389,6 +395,7 @@
                     <tbody>
                         ${files.map(file => `
                             <tr>
+                                <td><strong>${file.id}</strong></td>
                                 <td>
                                     <div class="file-name">
                                         <span class="file-icon">${fileTypeIcons[file.file_type] || fileTypeIcons.other}</span>
@@ -421,6 +428,11 @@
                                     ${file.has_been_processed === 4 ? `
                                         <button class="details-btn" style="background: #28a745; margin-left: 5px;" onclick="markForProcessing(${file.id})" title="Mark for Processing">
                                             ✅
+                                        </button>
+                                    ` : ''}
+                                    ${![0, 1, 2, 4].includes(file.has_been_processed) ? `
+                                        <button class="details-btn" style="background: #ffc107; color: #000; margin-left: 5px;" onclick="resetToQueue(${file.id})" title="Reset to Queue">
+                                            🔄
                                         </button>
                                     ` : ''}
                                 </td>
@@ -591,6 +603,39 @@ The worker will then process files automatically in the background.`);
 
             } catch (error) {
                 console.error('Error marking file for processing:', error);
+                alert('Failed to update file status: ' + error.message);
+            }
+        }
+
+        async function resetToQueue(fileId) {
+            if (!confirm('Reset this file to the processing queue? This will change its status from "Unknown" to "Unprocessed".')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/files/${fileId}/processing`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        has_been_processed: 0
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to update file status');
+                }
+
+                // Refresh the files list to show the updated status
+                loadFiles();
+                
+                alert('File reset to processing queue');
+
+            } catch (error) {
+                console.error('Error resetting file to queue:', error);
                 alert('Failed to update file status: ' + error.message);
             }
         }

@@ -342,21 +342,23 @@
         // Load users on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadUsers();
+            loadApiKeys();
         });
 
         function showSection(section) {
             // Hide all sections
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
             
             // Show selected section
             document.getElementById(section + '-section').classList.add('active');
             event.target.classList.add('active');
             
-            if (section === 'users') {
-                loadUsers();
-            } else if (section === 'keys') {
+            // Load data for the section
+            if (section === 'keys') {
                 loadApiKeys();
+            } else if (section === 'users') {
+                loadUsers();
             }
         }
 
@@ -510,14 +512,15 @@
 
         // API Key Management Functions
         async function loadApiKeys() {
-            document.getElementById('api-keys-loading').style.display = 'block';
+            const loadingElement = document.getElementById('api-keys-loading');
+            if (loadingElement) loadingElement.style.display = 'block';
             
             try {
                 const response = await fetch('/api/keys');
                 const data = await response.json();
                 
                 if (response.ok) {
-                    displayApiKeys(data.keys);
+                    displayApiKeys(data);
                 } else {
                     showMessage(data.error || 'Failed to load API keys', 'error');
                 }
@@ -525,7 +528,8 @@
                 showMessage('Failed to connect to server', 'error');
                 console.error('Error:', error);
             } finally {
-                document.getElementById('api-keys-loading').style.display = 'none';
+                const loadingElement = document.getElementById('api-keys-loading');
+                if (loadingElement) loadingElement.style.display = 'none';
             }
         }
 
@@ -541,8 +545,8 @@
             keys.forEach(key => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${key.key_name}</td>
-                    <td><code>${key.key_prefix}...</code></td>
+                    <td>${key.name}</td>
+                    <td><code>${key.prefix}</code></td>
                     <td>${key.created_at}</td>
                     <td>${key.last_used || 'Never'}</td>
                     <td>
@@ -574,12 +578,24 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ key_name: keyName })
+                    body: JSON.stringify({ name: keyName })
                 });
                 const data = await response.json();
                 
                 if (response.ok) {
-                    showMessage(`API key created successfully! Key: ${data.api_key}`, 'success');
+                    // Show the API key in a more prominent way
+                    const keyDisplay = `
+                        <div style="background: #e8f5e8; border: 2px solid #28a745; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <h4 style="color: #155724; margin: 0 0 10px 0;">✅ API Key Created Successfully!</h4>
+                            <p style="margin: 5px 0; color: #155724;"><strong>Key Name:</strong> ${data.name}</p>
+                            <p style="margin: 5px 0; color: #155724;"><strong>API Key:</strong></p>
+                            <div style="background: #fff; padding: 10px; border: 1px solid #28a745; border-radius: 4px; font-family: monospace; font-size: 14px; word-break: break-all; color: #000;">
+                                ${data.key}
+                            </div>
+                            <p style="margin: 10px 0 0 0; color: #856404; font-size: 12px;">⚠️ <strong>Important:</strong> Copy this key now! You won't be able to see it again.</p>
+                        </div>
+                    `;
+                    showMessage(keyDisplay, 'success');
                     document.getElementById('keyNameInput').value = '';
                     loadApiKeys(); // Refresh the table
                 } else {
@@ -617,6 +633,20 @@
         function showMessage(message, type) {
             const messageArea = document.getElementById('message-area');
             messageArea.innerHTML = `<div class="${type}">${message}</div>`;
+            
+            // For API key creation messages, show longer and add close button
+            if (message.includes('API Key Created Successfully')) {
+                const messageDiv = messageArea.querySelector(`.${type}`);
+                messageDiv.innerHTML += `
+                    <button onclick="this.parentElement.remove()" 
+                            style="float: right; background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-top: 10px;">
+                        Close
+                    </button>
+                `;
+                // Don't auto-hide API key messages
+                return;
+            }
+            
             setTimeout(() => {
                 messageArea.innerHTML = '';
             }, 5000);

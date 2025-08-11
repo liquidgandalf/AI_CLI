@@ -42,6 +42,33 @@ except ImportError:
     PDF_AVAILABLE = False
     print("⚠️  PyMuPDF not available. PDF text extraction will be skipped.")
 
+# Import pandas for Excel file processing
+try:
+    import pandas as pd
+    EXCEL_AVAILABLE = True
+except ImportError:
+    EXCEL_AVAILABLE = False
+    print("⚠️  pandas not available. Excel file processing will be skipped.")
+
+# Import libraries for Word document processing
+try:
+    from docx import Document
+    import docx2txt
+    WORD_AVAILABLE = True
+except ImportError:
+    WORD_AVAILABLE = False
+    print("⚠️  python-docx/docx2txt not available. Word document processing will be skipped.")
+
+# Import libraries for LibreOffice/OpenOffice document processing
+try:
+    from odf.opendocument import load
+    from odf.text import P
+    from odf.table import Table, TableRow, TableCell
+    ODF_AVAILABLE = True
+except ImportError:
+    ODF_AVAILABLE = False
+    print("⚠️  odfpy not available. LibreOffice/OpenOffice document processing will be skipped.")
+
 class FileProcessor:
     """Main file processing engine"""
     
@@ -180,6 +207,244 @@ class FileProcessor:
             print(f"❌ {error_msg}")
             return False, "", error_msg
     
+    def process_excel_file(self, file_path: str) -> Tuple[bool, str, Optional[str]]:
+        """
+        Extract content from Excel files using pandas
+        
+        Returns:
+            (success, text_content, error_message)
+        """
+        if not EXCEL_AVAILABLE:
+            return False, "", "pandas not available for Excel processing"
+        
+        if not os.path.exists(file_path):
+            return False, "", f"File not found: {file_path}"
+        
+        try:
+            print(f"📊 Processing Excel file: {os.path.basename(file_path)}")
+            
+            # Read all sheets from the Excel file
+            excel_file = pd.ExcelFile(file_path)
+            all_content = []
+            
+            for sheet_name in excel_file.sheet_names:
+                try:
+                    df = pd.read_excel(file_path, sheet_name=sheet_name)
+                    
+                    # Convert DataFrame to string representation
+                    sheet_content = f"=== SHEET: {sheet_name} ==="
+                    sheet_content += f"\nRows: {len(df)}, Columns: {len(df.columns)}\n"
+                    sheet_content += f"\nColumn Names: {', '.join(df.columns.astype(str))}\n\n"
+                    
+                    # Add the actual data (limit to first 1050 rows to avoid huge content)
+                    if len(df) > 0:
+                        display_df = df.head(1050)  # Show first 1050 rows
+                        sheet_content += display_df.to_string(index=False, max_rows=1050)
+                        
+                        if len(df) > 1050:
+                            sheet_content += f"\n\n... ({len(df) - 1050} more rows not shown)"
+                    else:
+                        sheet_content += "(Empty sheet)"
+                    
+                    all_content.append(sheet_content)
+                    
+                except Exception as sheet_error:
+                    all_content.append(f"=== SHEET: {sheet_name} ===\nError reading sheet: {sheet_error}")
+            
+            final_content = "\n\n".join(all_content)
+            print(f"✅ Excel processing completed. Found {len(excel_file.sheet_names)} sheets")
+            return True, final_content, None
+            
+        except Exception as e:
+            error_msg = f"Excel processing failed: {str(e)}"
+            print(f"❌ {error_msg}")
+            return False, "", error_msg
+    
+    def process_word_file(self, file_path: str) -> Tuple[bool, str, Optional[str]]:
+        """
+        Extract content from Word documents (.docx and .doc)
+        
+        Returns:
+            (success, text_content, error_message)
+        """
+        if not WORD_AVAILABLE:
+            return False, "", "python-docx/docx2txt not available for Word processing"
+        
+        if not os.path.exists(file_path):
+            return False, "", f"File not found: {file_path}"
+        
+        try:
+            print(f"📄 Processing Word document: {os.path.basename(file_path)}")
+            
+            # Check file extension to determine processing method
+            file_ext = os.path.splitext(file_path)[1].lower()
+            
+            if file_ext == '.docx':
+                # Use python-docx for .docx files
+                doc = Document(file_path)
+                
+                # Extract text from paragraphs
+                paragraphs = []
+                for paragraph in doc.paragraphs:
+                    if paragraph.text.strip():
+                        paragraphs.append(paragraph.text.strip())
+                
+                # Extract text from tables
+                tables_content = []
+                for table in doc.tables:
+                    table_data = []
+                    for row in table.rows:
+                        row_data = []
+                        for cell in row.cells:
+                            row_data.append(cell.text.strip())
+                        if any(row_data):  # Only add non-empty rows
+                            table_data.append(" | ".join(row_data))
+                    
+                    if table_data:
+                        tables_content.append("=== TABLE ===\n" + "\n".join(table_data))
+                
+                # Combine all content
+                all_content = []
+                if paragraphs:
+                    all_content.append("=== DOCUMENT TEXT ===\n" + "\n\n".join(paragraphs))
+                if tables_content:
+                    all_content.append("\n\n".join(tables_content))
+                
+                final_content = "\n\n".join(all_content)
+                
+            elif file_ext == '.doc':
+                # Use docx2txt for .doc files (simpler extraction)
+                final_content = docx2txt.process(file_path)
+                if final_content:
+                    final_content = "=== DOCUMENT TEXT ===\n" + final_content.strip()
+                else:
+                    final_content = "(No readable text found in document)"
+            
+            else:
+                return False, "", f"Unsupported Word document format: {file_ext}"
+            
+            if not final_content or final_content.strip() == "=== DOCUMENT TEXT ===" or final_content.strip() == "(No readable text found in document)":
+                final_content = "(Document appears to be empty or contains no readable text)"
+            
+            print(f"✅ Word document processing completed. Extracted {len(final_content)} characters")
+            return True, final_content, None
+            
+        except Exception as e:
+            error_msg = f"Word document processing failed: {str(e)}"
+            print(f"❌ {error_msg}")
+            return False, "", error_msg
+    
+    def process_odf_file(self, file_path: str) -> Tuple[bool, str, Optional[str]]:
+        """
+        Extract content from LibreOffice/OpenOffice documents (.odt, .ods)
+        
+        Returns:
+            (success, text_content, error_message)
+        """
+        if not ODF_AVAILABLE:
+            return False, "", "odfpy not available for LibreOffice/OpenOffice processing"
+        
+        if not os.path.exists(file_path):
+            return False, "", f"File not found: {file_path}"
+        
+        try:
+            print(f"📄 Processing LibreOffice/OpenOffice document: {os.path.basename(file_path)}")
+            
+            # Load the ODF document
+            doc = load(file_path)
+            file_ext = os.path.splitext(file_path)[1].lower()
+            
+            all_content = []
+            
+            if file_ext == '.odt':  # Writer document
+                # Extract paragraphs
+                paragraphs = []
+                for paragraph in doc.getElementsByType(P):
+                    text = str(paragraph).strip()
+                    if text and not text.startswith('<') and not text.endswith('>'):
+                        # Clean up the text (remove XML-like content)
+                        clean_text = paragraph.firstChild.data if paragraph.firstChild else ""
+                        if clean_text and clean_text.strip():
+                            paragraphs.append(clean_text.strip())
+                
+                # Extract tables
+                tables_content = []
+                for table in doc.getElementsByType(Table):
+                    table_data = []
+                    for row in table.getElementsByType(TableRow):
+                        row_data = []
+                        for cell in row.getElementsByType(TableCell):
+                            cell_text = ""
+                            for p in cell.getElementsByType(P):
+                                if p.firstChild:
+                                    cell_text += str(p.firstChild.data or "").strip() + " "
+                            row_data.append(cell_text.strip())
+                        if any(row_data):  # Only add non-empty rows
+                            table_data.append(" | ".join(row_data))
+                    
+                    if table_data:
+                        tables_content.append("=== TABLE ===\n" + "\n".join(table_data))
+                
+                # Combine content
+                if paragraphs:
+                    all_content.append("=== DOCUMENT TEXT ===\n" + "\n\n".join(paragraphs))
+                if tables_content:
+                    all_content.extend(tables_content)
+            
+            elif file_ext == '.ods':  # Calc spreadsheet
+                # Extract spreadsheet data
+                sheets_content = []
+                
+                # Get all tables (sheets) in the spreadsheet
+                tables = doc.getElementsByType(Table)
+                
+                for i, table in enumerate(tables):
+                    sheet_name = table.getAttribute('name') or f"Sheet{i+1}"
+                    sheet_data = []
+                    
+                    rows = table.getElementsByType(TableRow)
+                    for row in rows:
+                        row_data = []
+                        cells = row.getElementsByType(TableCell)
+                        for cell in cells:
+                            cell_text = ""
+                            for p in cell.getElementsByType(P):
+                                if p.firstChild:
+                                    cell_text += str(p.firstChild.data or "").strip() + " "
+                            row_data.append(cell_text.strip())
+                        
+                        # Only add rows that have some content
+                        if any(cell.strip() for cell in row_data):
+                            sheet_data.append(" | ".join(row_data))
+                    
+                    if sheet_data:
+                        sheet_content = f"=== SHEET: {sheet_name} ===\n"
+                        sheet_content += f"Rows: {len(sheet_data)}\n\n"
+                        sheet_content += "\n".join(sheet_data[:1050])  # Limit to first 1050 rows
+                        
+                        if len(sheet_data) > 1050:
+                            sheet_content += f"\n\n... ({len(sheet_data) - 1050} more rows not shown)"
+                        
+                        sheets_content.append(sheet_content)
+                
+                all_content.extend(sheets_content)
+            
+            else:
+                return False, "", f"Unsupported ODF document format: {file_ext}"
+            
+            if not all_content:
+                final_content = "(Document appears to be empty or contains no readable content)"
+            else:
+                final_content = "\n\n".join(all_content)
+            
+            print(f"✅ LibreOffice/OpenOffice document processing completed. Extracted {len(final_content)} characters")
+            return True, final_content, None
+            
+        except Exception as e:
+            error_msg = f"LibreOffice/OpenOffice document processing failed: {str(e)}"
+            print(f"❌ {error_msg}")
+            return False, "", error_msg
+    
     def process_file(self, chat_file: ChatFile) -> Tuple[bool, str, Optional[str]]:
         """
         Process a file based on its type
@@ -193,11 +458,16 @@ class FileProcessor:
             return self.process_audio_file(file_path)
         elif chat_file.file_type == 'text':
             return self.process_text_file(file_path)
-        elif chat_file.file_type == 'document' and chat_file.original_filename.lower().endswith('.pdf'):
+        elif chat_file.file_type == 'document' and chat_file.mime_type == 'application/pdf':
             return self.process_pdf_file(file_path)
+        elif chat_file.file_type == 'document' and chat_file.mime_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
+            return self.process_excel_file(file_path)
+        elif chat_file.file_type == 'document' and chat_file.mime_type in ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
+            return self.process_word_file(file_path)
+        elif chat_file.file_type == 'document' and chat_file.mime_type in ['application/vnd.oasis.opendocument.text', 'application/vnd.oasis.opendocument.spreadsheet']:
+            return self.process_odf_file(file_path)
         else:
-            # For now, unsupported file types
-            return False, "", f"File type '{chat_file.file_type}' not yet supported for processing"
+            return False, "", f"File type '{chat_file.file_type}' with MIME type '{chat_file.mime_type}' not yet supported for processing"
 
 def get_next_unprocessed_file(db) -> Optional[ChatFile]:
     """Get the next unprocessed file (status = 0) and mark it as being processed (status = 1)
@@ -239,11 +509,11 @@ def mark_file_processed(db, chat_file: ChatFile, transcoded_content: str, proces
 def mark_file_failed(db, chat_file: ChatFile, error_message: str, processing_time: float):
     """Mark file as failed processing"""
     try:
-        chat_file.has_been_processed = 0  # Reset to unprocessed for retry
+        chat_file.has_been_processed = 3  # Mark as permanently failed (not 0 which would retry)
         chat_file.human_notes = f"Processing failed at {datetime.utcnow()}: {error_message}"
         chat_file.time_to_process = processing_time
         db.commit()
-        print(f"❌ File marked as failed: {chat_file.original_filename}")
+        print(f"❌ File marked as permanently failed: {chat_file.original_filename}")
     except Exception as e:
         print(f"❌ Error marking file as failed: {e}")
         db.rollback()
