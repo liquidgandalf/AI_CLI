@@ -274,6 +274,9 @@ function displayActiveChats(chats) {
                     <button onclick="archiveChat(${chat.id})" class="action-btn btn-danger" title="Archive fully">
                         📦 Archive
                     </button>
+                    <button onclick="deleteChat(${chat.id})" class="action-btn btn-danger" title="Delete permanently">
+                        🗑️ Delete
+                    </button>
                 </div>
             </div>
         `;
@@ -362,6 +365,9 @@ function displayHiddenChats(chats) {
                     </button>
                     <button onclick="archiveChat(${chat.id})" class="action-btn btn-warning" title="Archive fully">
                         📦 Archive
+                    </button>
+                    <button onclick="deleteChat(${chat.id})" class="action-btn btn-danger" title="Delete permanently">
+                        🗑️ Delete
                     </button>
                 </div>
             </div>
@@ -667,7 +673,10 @@ async function deleteChat(chatId) {
         
         if (response.ok) {
             showMessage('Conversation deleted permanently', 'success');
-            loadArchivedChats(); // Refresh the list
+            // Refresh lists across sections in case deletion happened from any state
+            loadActiveChats();
+            loadHiddenChats();
+            loadArchivedChats();
         } else {
             showMessage('Failed to delete conversation: ' + (data.error || 'Unknown error'), 'error');
         }

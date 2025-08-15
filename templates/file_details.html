@@ -358,12 +358,37 @@
                 `;
             }
             
-            // Add summary if available
-            if (file.summary_raw_file) {
+            // Add summaries: render both raw summary and AI summary if present
+            const hasRawSummary = !!file.summary_raw_file;
+            const hasAiSummary = !!file.ai_summary;
+            if (hasRawSummary || hasAiSummary) {
+                if (hasRawSummary) {
+                    content += `
+                        <div class="content-section">
+                            <h2 class="section-title">Summary (Raw)</h2>
+                            <div class="summary-content">${file.summary_raw_file}</div>
+                        </div>
+                    `;
+                }
+                if (hasAiSummary) {
+                    content += `
+                        <div class="content-section">
+                            <h2 class="section-title">AI Summary</h2>
+                            <div class="summary-content">${file.ai_summary}</div>
+                        </div>
+                    `;
+                }
+            } else {
+                // Show a helpful placeholder with current status if no summary yet
+                const statusText = (typeof file.status_summary === 'number') ? (
+                    file.status_summary === 1 ? 'Summarizing...' :
+                    file.status_summary === 3 ? 'Summarization failed. Check logs or reprocess.' :
+                    'No summary available.'
+                ) : 'No summary available.';
                 content += `
                     <div class="content-section">
                         <h2 class="section-title">Summary</h2>
-                        <div class="summary-content">${file.summary_raw_file}</div>
+                        <div class="summary-content" style="font-style: italic; color: #aaa;">${statusText}</div>
                     </div>
                 `;
             }

@@ -469,6 +469,30 @@ def create_conversation():
     
     db = get_db()
     try:
+        # Cleanup: remove other empty "New Chat" conversations for this user
+        # Only delete conversations that still have the default title and no messages
+        old_new_chats = db.query(Conversation).filter(
+            Conversation.user_id == current_user.id,
+            Conversation.title == 'New Chat'
+        ).all()
+        for old_conv in old_new_chats:
+            # Skip deletion if this conversation has any messages
+            msg_count = db.query(Message).filter(Message.conversation_id == old_conv.id).count()
+            if msg_count == 0:
+                # Delete associated files from disk and database
+                files = db.query(ChatFile).filter(ChatFile.conversation_id == old_conv.id).all()
+                for chat_file in files:
+                    file_path = get_file_full_path(chat_file.file_path)
+                    if os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                        except OSError as e:
+                            print(f"Warning: Could not delete file {file_path}: {e}")
+                    db.delete(chat_file)
+                # Delete messages (none expected) and the conversation
+                db.query(Message).filter(Message.conversation_id == old_conv.id).delete()
+                db.delete(old_conv)
+        
         # Create new conversation
         conversation = Conversation(
             user_id=current_user.id,
@@ -1530,20 +1554,40 @@ def reprocess_file(file_id):
 @login_required
 @access_required
 def get_all_user_files():
-    """Get all files uploaded by the current user"""
+    """Get files uploaded by the current user with pagination"""
     db = get_db()
     try:
-        # Get all files for the current user
-        files = db.query(ChatFile).join(Conversation).filter(
+        # Pagination params
+        try:
+            page = int(request.args.get('page', '1'))
+        except ValueError:
+            page = 1
+        try:
+            per_page = int(request.args.get('per_page', '50'))
+        except ValueError:
+            per_page = 50
+        page = max(1, page)
+        per_page = max(1, min(per_page, 200))
+
+        base_q = db.query(ChatFile).join(Conversation).filter(
             Conversation.user_id == current_user.id
-        ).order_by(ChatFile.upload_date.desc()).all()
-        
+        )
+
+        total_count = base_q.count()
+
+        items = (
+            base_q
+            .order_by(ChatFile.upload_date.desc())
+            .limit(per_page)
+            .offset((page - 1) * per_page)
+            .all()
+        )
+
         files_data = []
-        for file in files:
-            # Get conversation and project info
+        for file in items:
             conversation = file.conversation
             project = conversation.project if conversation.project_id else None
-            
+
             files_data.append({
                 'id': file.id,
                 'original_filename': file.original_filename,
@@ -1555,6 +1599,8 @@ def get_all_user_files():
                 'has_been_processed': file.has_been_processed,
                 'date_processed': file.date_processed.isoformat() if file.date_processed else None,
                 'time_to_process': file.time_to_process,
+                'ai_summary': file.ai_summary,
+                'status_summary': file.status_summary,
                 'human_notes': file.human_notes,
                 'conversation': {
                     'id': conversation.id,
@@ -1565,12 +1611,19 @@ def get_all_user_files():
                     'name': project.name
                 } if project else None
             })
-        
+
+        total_pages = (total_count + per_page - 1) // per_page if per_page else 1
+
         return jsonify({
             'files': files_data,
-            'count': len(files_data)
+            'count': total_count,  # keep original name for compatibility
+            'page': page,
+            'per_page': per_page,
+            'total_pages': total_pages,
+            'has_next': page < total_pages,
+            'has_prev': page > 1
         })
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1608,6 +1661,8 @@ def get_file_details(file_id):
             'has_been_processed': file_obj.has_been_processed,
             'transcoded_raw_file': file_obj.transcoded_raw_file,
             'summary_raw_file': file_obj.summary_raw_file,
+            'ai_summary': getattr(file_obj, 'ai_summary', None),
+            'status_summary': getattr(file_obj, 'status_summary', None),
             'human_notes': file_obj.human_notes,
             'date_processed': file_obj.date_processed.isoformat() if file_obj.date_processed else None,
             'time_to_process': file_obj.time_to_process,
@@ -1664,6 +1719,18 @@ def get_worker_status():
         except:
             worker_running = False
         
+        # Summary worker statistics
+        summary_pending = db.query(ChatFile).filter(ChatFile.status_summary == 0).count()
+        summary_processing = db.query(ChatFile).filter(ChatFile.status_summary == 1).count()
+        summary_ready = db.query(ChatFile).filter(ChatFile.status_summary == 2).count()
+        summary_failed = db.query(ChatFile).filter(ChatFile.status_summary == 3).count()
+        try:
+            sum_result = subprocess.run(['pgrep', '-f', 'summarize_transcoded_files.py'],
+                                        capture_output=True, text=True)
+            summary_worker_running = len(sum_result.stdout.strip()) > 0
+        except:
+            summary_worker_running = False
+        
         return jsonify({
             'worker_running': worker_running,
             'queue_stats': {
@@ -1671,6 +1738,14 @@ def get_worker_status():
                 'processing': processing_files,
                 'processed': processed_files,
                 'total': unprocessed_files + processing_files + processed_files
+            },
+            'summary_worker_running': summary_worker_running,
+            'summary_stats': {
+                'pending': summary_pending,
+                'processing': summary_processing,
+                'ready': summary_ready,
+                'failed': summary_failed,
+                'total': summary_pending + summary_processing + summary_ready + summary_failed
             }
         })
         
@@ -2096,6 +2171,26 @@ def api_create_conversation():
     
     db = get_db()
     try:
+        # Cleanup: remove other empty "New Chat" conversations for this user (if they used the default UI title)
+        old_new_chats = db.query(Conversation).filter(
+            Conversation.user_id == request.api_user.id,
+            Conversation.title == 'New Chat'
+        ).all()
+        for old_conv in old_new_chats:
+            msg_count = db.query(Message).filter(Message.conversation_id == old_conv.id).count()
+            if msg_count == 0:
+                files = db.query(ChatFile).filter(ChatFile.conversation_id == old_conv.id).all()
+                for chat_file in files:
+                    file_path = get_file_full_path(chat_file.file_path)
+                    if os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                        except OSError as e:
+                            print(f"Warning: Could not delete file {file_path}: {e}")
+                    db.delete(chat_file)
+                db.query(Message).filter(Message.conversation_id == old_conv.id).delete()
+                db.delete(old_conv)
+        
         new_conversation = Conversation(
             title=title,
             user_id=request.api_user.id
@@ -2817,4 +2912,4 @@ if __name__ == '__main__':
     print(f"Starting AI Chat Interface...")
     print(f"Using model: {DEFAULT_MODEL}")
     print(f"Ollama URL: {OLLAMA_URL}")
-    app.run(host='0.0.0.0', port=5785, debug=True)
+    app.run(host='0.0.0.0', port=5785, debug=True, threaded=True, use_reloader=False)

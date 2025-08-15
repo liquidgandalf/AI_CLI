@@ -43,7 +43,7 @@
 - **Available**: 761 GB
 - **File System**: ext4
 - **Boot**: EFI (1.1 GB partition)
-
+f
 ## 🐧 Operating System
 
 - **OS**: Ubuntu 24.04.1 LTS

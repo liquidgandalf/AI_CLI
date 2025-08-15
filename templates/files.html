@@ -34,7 +34,7 @@
         .files-table {
             background: #2a2a2a;
             border-radius: 8px;
-            overflow: hidden;
+            overflow-x: auto;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
         
@@ -69,7 +69,19 @@
         
         .file-name {
             display: flex;
-            align-items: center;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .file-name .name-text {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .actions-inline {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-start;
         }
         
         .processing-status {
@@ -128,6 +140,28 @@
         .project-link:hover, .conversation-link:hover {
             text-decoration: underline;
         }
+
+        /* AI Summary styles */
+        .summary-status {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75em;
+            margin-left: 6px;
+        }
+        .summary-pending { background: #444; color: #aaa; }
+        .summary-processing { background: #ffa500; color: #000; }
+        .summary-ready { background: #28a745; color: #fff; }
+        .summary-failed { background: #dc3545; color: #fff; }
+        .summary-block { color: #ddd; line-height: 1.4; }
+        .summary-empty { color: #aaa; font-style: italic; }
+        .summary-header { font-weight: 600; color: #fff; margin-right: 8px; }
+        details.summary-details > summary {
+            cursor: pointer;
+            list-style: none;
+            color: #fff;
+        }
+        details.summary-details > summary::-webkit-details-marker { display: none; }
         
         .no-files {
             text-align: center;
@@ -304,6 +338,7 @@
                 Loading files...
             </div>
         </div>
+        <div id="paginationControls" style="margin-top: 12px;"></div>
     </div>
 
     <script>
@@ -336,6 +371,26 @@
             }
         }
 
+        function getSummaryStatusDisplay(status) {
+            switch (status) {
+                case 0: return 'Summary: Pending';
+                case 1: return 'Summary: Processing';
+                case 2: return 'Summary: Ready';
+                case 3: return 'Summary: Failed';
+                default: return 'Summary: Unknown';
+            }
+        }
+
+        function getSummaryStatusClass(status) {
+            switch (status) {
+                case 0: return 'summary-pending';
+                case 1: return 'summary-processing';
+                case 2: return 'summary-ready';
+                case 3: return 'summary-failed';
+                default: return 'summary-pending';
+            }
+        }
+
         function formatDate(dateString) {
             return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
         }
@@ -344,17 +399,27 @@
             window.location.href = `/files/${fileId}`;
         }
 
-        async function loadFiles() {
+        // Pagination state
+        let currentPage = 1;
+        const perPage = 50;
+        let totalPages = 1;
+        let totalCount = 0;
+
+        async function loadFiles(page = currentPage) {
             try {
-                const response = await fetch('/api/files');
+                const response = await fetch(`/api/files?page=${page}&per_page=${perPage}`);
                 const data = await response.json();
                 
                 if (!response.ok) {
                     throw new Error(data.error || 'Failed to load files');
                 }
                 
+                currentPage = data.page || 1;
+                totalPages = data.total_pages || 1;
+                totalCount = data.count || 0;
                 displayFiles(data.files);
-                updateStats(data.count);
+                updateStats(totalCount);
+                renderPagination();
                 
             } catch (error) {
                 console.error('Error loading files:', error);
@@ -363,6 +428,7 @@
                         Error loading files: ${error.message}
                     </div>
                 `;
+                document.getElementById('paginationControls').innerHTML = '';
             }
         }
 
@@ -378,11 +444,12 @@
                 return;
             }
             
+            console.log('DEBUG: About to generate table with', files.length, 'files');
+            
             const tableHtml = `
                 <table>
                     <thead>
                         <tr>
-                            <th>File ID</th>
                             <th>File</th>
                             <th>Type</th>
                             <th>Size</th>
@@ -393,13 +460,15 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${files.map(file => `
+                        ${files.map(file => {
+                            console.log('DEBUG: Processing file', file.id, file.upload_date);
+                            return `
                             <tr>
-                                <td><strong>${file.id}</strong></td>
                                 <td>
                                     <div class="file-name">
                                         <span class="file-icon">${fileTypeIcons[file.file_type] || fileTypeIcons.other}</span>
-                                        ${file.original_filename}
+                                        <a href="/files/${file.id}" style="color: #4CAF50; text-decoration: none;">#${file.id}</a>
+                                        <span class="name-text">${file.original_filename}</span>
                                     </div>
                                 </td>
                                 <td>${file.file_type}</td>
@@ -411,43 +480,90 @@
                                     ${file.project ? `<br><a href="/chat?project=${file.project.id}" class="project-link">${file.project.name}</a>` : ''}
                                 </td>
                                 <td>
-                                    <span class="processing-status ${getProcessingStatusClass(file.has_been_processed)}">
-                                        ${getProcessingStatusDisplay(file.has_been_processed)}
-                                    </span>
+                                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                        <span class="processing-status ${getProcessingStatusClass(file.has_been_processed)}">
+                                            ${getProcessingStatusDisplay(file.has_been_processed)}
+                                        </span>
+                                        <span class="summary-status ${getSummaryStatusClass(file.status_summary)}">
+                                            ${getSummaryStatusDisplay(file.status_summary)}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td>${formatDate(file.upload_date)}</td>
                                 <td>
-                                    <button class="details-btn" onclick="viewFileDetails(${file.id})">
-                                        Details
-                                    </button>
-                                    ${file.has_been_processed === 0 || file.has_been_processed === 1 ? `
-                                        <button class="details-btn" style="background: #6c757d; margin-left: 5px;" onclick="markDoNotProcess(${file.id})" title="Mark as Do Not Process">
-                                            🚫
-                                        </button>
-                                    ` : ''}
-                                    ${file.has_been_processed === 4 ? `
-                                        <button class="details-btn" style="background: #28a745; margin-left: 5px;" onclick="markForProcessing(${file.id})" title="Mark for Processing">
-                                            ✅
-                                        </button>
-                                    ` : ''}
-                                    ${![0, 1, 2, 4].includes(file.has_been_processed) ? `
-                                        <button class="details-btn" style="background: #ffc107; color: #000; margin-left: 5px;" onclick="resetToQueue(${file.id})" title="Reset to Queue">
-                                            🔄
-                                        </button>
-                                    ` : ''}
+                                     <a href="/files/${file.id}">Details</a>
                                 </td>
-                            </tr>
-                        `).join('')}
+                             </tr>
+                             <tr style="background: #1e1e1e;">
+                                <td colspan="7" style="padding: 10px 15px; border-top: 1px solid #444;">
+                                    <div>
+                                        <div class="actions-inline">
+                                                <strong>Actions:</strong>
+                                                <a href="/files/${file.id}" style="background: #28a745; color: white; padding: 4px 8px; border-radius: 3px; text-decoration: none; font-size: 12px;">View Details</a>
+                                                <a href="/api/files/${file.id}/download" style="background: #007bff; color: white; padding: 4px 8px; border-radius: 3px; text-decoration: none; font-size: 12px;" target="_blank">📁 View/Open</a>
+                                                <a href="/api/files/${file.id}/download" style="background: #6f42c1; color: white; padding: 4px 8px; border-radius: 3px; text-decoration: none; font-size: 12px;" download>⬇️ Download</a>
+                                                ${file.has_been_processed === 0 || file.has_been_processed === 1 ? `
+                                                    <button style="background: #6c757d; color: white; padding: 4px 8px; border: none; border-radius: 3px; font-size: 12px; cursor: pointer;" onclick="window.markDoNotProcess(${file.id})" title="Mark as Do Not Process">
+                                                        🚫 Do Not Process
+                                                    </button>
+                                                ` : ''}
+                                                ${file.has_been_processed === 4 ? `
+                                                    <button style="background: #28a745; color: white; padding: 4px 8px; border: none; border-radius: 3px; font-size: 12px; cursor: pointer;" onclick="window.markForProcessing(${file.id})" title="Mark for Processing">
+                                                        ✅ Mark for Processing
+                                                    </button>
+                                                ` : ''}
+                                                ${(file.has_been_processed !== 0 && file.has_been_processed !== 1 && file.has_been_processed !== 2 && file.has_been_processed !== 4) ? `
+                                                    <button style="background: #ffc107; color: #000; padding: 4px 8px; border: none; border-radius: 3px; font-size: 12px; cursor: pointer;" onclick="window.resetToQueue(${file.id})" title="Reset to Queue">
+                                                        🔄 Reset to Queue
+                                                    </button>
+                                                ` : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                             </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             `;
             
+            console.log('DEBUG: Generated table HTML length:', tableHtml.length);
+            console.log('DEBUG: About to insert table into DOM element:', filesTable);
+            
             filesTable.innerHTML = tableHtml;
+            
+            console.log('DEBUG: Table inserted. DOM element now has', filesTable.children.length, 'children');
+            console.log('DEBUG: Table HTML preview:', tableHtml.substring(0, 500));
         }
 
         function updateStats(count) {
             const statsElement = document.getElementById('filesStats');
-            statsElement.textContent = `${count} file${count !== 1 ? 's' : ''} total`;
+            statsElement.textContent = `${count} file${count !== 1 ? 's' : ''} total · Page ${currentPage} of ${totalPages}`;
+        }
+
+        function renderPagination() {
+            const el = document.getElementById('paginationControls');
+            if (totalPages <= 1) {
+                el.innerHTML = '';
+                return;
+            }
+            const startIdx = (currentPage - 1) * perPage + 1;
+            const endIdx = Math.min(currentPage * perPage, totalCount);
+            el.innerHTML = `
+                <div style="display:flex; align-items:center; justify-content: space-between; background:#2a2a2a; padding:8px 12px; border-radius:6px; border:1px solid #333;">
+                    <div style="color:#aaa; font-size:0.9em;">Showing ${startIdx}-${endIdx} of ${totalCount}</div>
+                    <div style="display:flex; gap:8px;">
+                        <button id="prevPageBtn" class="worker-btn" style="background:#333; color:#fff;" ${currentPage <= 1 ? 'disabled' : ''}>◀ Prev</button>
+                        <span style="color:#ddd;">Page ${currentPage} / ${totalPages}</span>
+                        <button id="nextPageBtn" class="worker-btn" style="background:#333; color:#fff;" ${currentPage >= totalPages ? 'disabled' : ''}>Next ▶</button>
+                    </div>
+                </div>
+            `;
+            const prev = document.getElementById('prevPageBtn');
+            const next = document.getElementById('nextPageBtn');
+            if (prev) prev.onclick = () => { if (currentPage > 1) loadFiles(currentPage - 1); };
+            if (next) next.onclick = () => { if (currentPage < totalPages) loadFiles(currentPage + 1); };
         }
 
         async function loadWorkerStatus() {
@@ -480,6 +596,8 @@
             const workerStatus = document.getElementById('workerStatus');
             const isRunning = status.worker_running;
             const stats = status.queue_stats;
+            const isSummaryRunning = status.summary_worker_running;
+            const sstats = status.summary_stats || { pending: 0, processing: 0, ready: 0, failed: 0, total: 0 };
             
             const statusHtml = `
                 <div class="worker-status-header">
@@ -508,6 +626,39 @@
                     <div class="queue-stat">
                         <span class="queue-stat-number">${stats.total}</span>
                         <span class="queue-stat-label">Total Files</span>
+                    </div>
+                </div>
+                
+                <div class="worker-status-header" style="margin-top: 16px;">
+                    <h3 class="worker-status-title">🧠 Summary Worker</h3>
+                    <div class="worker-indicator">
+                        <span class="status-dot ${isSummaryRunning ? 'status-running' : 'status-stopped'}"></span>
+                        <span style="color: ${isSummaryRunning ? '#28a745' : '#dc3545'};">
+                            ${isSummaryRunning ? 'Running' : 'Stopped'}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="queue-stats">
+                    <div class="queue-stat">
+                        <span class="queue-stat-number">${sstats.pending}</span>
+                        <span class="queue-stat-label">Pending</span>
+                    </div>
+                    <div class="queue-stat">
+                        <span class="queue-stat-number">${sstats.processing}</span>
+                        <span class="queue-stat-label">Processing</span>
+                    </div>
+                    <div class="queue-stat">
+                        <span class="queue-stat-number">${sstats.ready}</span>
+                        <span class="queue-stat-label">Ready</span>
+                    </div>
+                    <div class="queue-stat">
+                        <span class="queue-stat-number">${sstats.failed}</span>
+                        <span class="queue-stat-label">Failed</span>
+                    </div>
+                    <div class="queue-stat">
+                        <span class="queue-stat-number">${sstats.total}</span>
+                        <span class="queue-stat-label">Total Summaries</span>
                     </div>
                 </div>
                 
@@ -640,14 +791,22 @@ The worker will then process files automatically in the background.`);
             }
         }
 
+        // Make functions globally accessible for dynamically generated buttons
+        window.markDoNotProcess = markDoNotProcess;
+        window.markForProcessing = markForProcessing;
+        window.resetToQueue = resetToQueue;
+
         // Load files and worker status when page loads
         document.addEventListener('DOMContentLoaded', () => {
-            loadFiles();
+            loadFiles(1);
             loadWorkerStatus();
             
             // Auto-refresh worker status every 30 seconds
             setInterval(loadWorkerStatus, 30000);
         });
     </script>
+    
+
+    
 </body>
 </html>

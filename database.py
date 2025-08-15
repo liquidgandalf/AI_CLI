@@ -94,6 +94,9 @@ class ChatFile(Base):
     has_been_processed = Column(Integer, default=0, nullable=False)  # 0=unprocessed, 1=being processed, 2=processed
     transcoded_raw_file = Column(Text, nullable=True)        # Raw response from processing (can be very long)
     summary_raw_file = Column(Text, nullable=True)           # Summary of processed file (can be long)
+    # AI summarization fields
+    ai_summary = Column(Text, nullable=True)                 # Short AI-generated summary of the processed content
+    status_summary = Column(Integer, default=0, nullable=False)  # 0=pending, 1=processing, 2=done, 3=failed
     human_notes = Column(Text, nullable=True)                # Human notes about the file
     date_processed = Column(DateTime, nullable=True)         # When processing was completed
     time_to_process = Column(Float, nullable=True)           # Time taken to process in seconds
