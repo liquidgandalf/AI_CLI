@@ -50,6 +50,8 @@ FILE_TYPE_MAPPINGS = {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'document',
     'application/vnd.ms-powerpoint': 'document',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'document',
+    'text/csv': 'document',
+    'application/vnd.oasis.opendocument.spreadsheet': 'document',
     
     # Archive files
     'application/zip': 'archive',
@@ -64,7 +66,7 @@ ALLOWED_EXTENSIONS = {
     'audio': {'mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'mpga'},
     'image': {'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'},
     'text': {'txt', 'md', 'html', 'css', 'js', 'json', 'xml', 'py', 'sql'},
-    'document': {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'},
+    'document': {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'ods'},
     'archive': {'zip', 'tar', 'gz', 'rar'},
 }
 
