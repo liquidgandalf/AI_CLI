@@ -1694,20 +1694,39 @@ def get_worker_status():
     """Get background worker status and processing queue info"""
     db = get_db()
     try:
+        # Counts should be scoped to the current user (align with files listing)
         # Check for files currently being processed
-        processing_files = db.query(ChatFile).filter(
-            ChatFile.has_been_processed == 1
-        ).count()
+        processing_files = (
+            db.query(ChatFile)
+            .join(Conversation)
+            .filter(
+                Conversation.user_id == current_user.id,
+                ChatFile.has_been_processed == 1
+            )
+            .count()
+        )
         
         # Check for unprocessed files in queue
-        unprocessed_files = db.query(ChatFile).filter(
-            ChatFile.has_been_processed == 0
-        ).count()
+        unprocessed_files = (
+            db.query(ChatFile)
+            .join(Conversation)
+            .filter(
+                Conversation.user_id == current_user.id,
+                ChatFile.has_been_processed == 0
+            )
+            .count()
+        )
         
         # Check for processed files
-        processed_files = db.query(ChatFile).filter(
-            ChatFile.has_been_processed == 2
-        ).count()
+        processed_files = (
+            db.query(ChatFile)
+            .join(Conversation)
+            .filter(
+                Conversation.user_id == current_user.id,
+                ChatFile.has_been_processed == 2
+            )
+            .count()
+        )
         
         # Simple check if worker process might be running
         # (This is a basic check - in production you'd want more sophisticated monitoring)
@@ -1719,11 +1738,43 @@ def get_worker_status():
         except:
             worker_running = False
         
-        # Summary worker statistics
-        summary_pending = db.query(ChatFile).filter(ChatFile.status_summary == 0).count()
-        summary_processing = db.query(ChatFile).filter(ChatFile.status_summary == 1).count()
-        summary_ready = db.query(ChatFile).filter(ChatFile.status_summary == 2).count()
-        summary_failed = db.query(ChatFile).filter(ChatFile.status_summary == 3).count()
+        # Summary worker statistics (also scoped to current user)
+        summary_pending = (
+            db.query(ChatFile)
+            .join(Conversation)
+            .filter(
+                Conversation.user_id == current_user.id,
+                ChatFile.status_summary == 0
+            )
+            .count()
+        )
+        summary_processing = (
+            db.query(ChatFile)
+            .join(Conversation)
+            .filter(
+                Conversation.user_id == current_user.id,
+                ChatFile.status_summary == 1
+            )
+            .count()
+        )
+        summary_ready = (
+            db.query(ChatFile)
+            .join(Conversation)
+            .filter(
+                Conversation.user_id == current_user.id,
+                ChatFile.status_summary == 2
+            )
+            .count()
+        )
+        summary_failed = (
+            db.query(ChatFile)
+            .join(Conversation)
+            .filter(
+                Conversation.user_id == current_user.id,
+                ChatFile.status_summary == 3
+            )
+            .count()
+        )
         try:
             sum_result = subprocess.run(['pgrep', '-f', 'summarize_transcoded_files.py'],
                                         capture_output=True, text=True)
@@ -1731,6 +1782,31 @@ def get_worker_status():
         except:
             summary_worker_running = False
         
+        # Summarizer allowed processing window (local time)
+        try:
+            start_hour = int(os.environ.get('SUMMARY_START_HOUR', '1'))
+        except Exception:
+            start_hour = 1
+        try:
+            end_hour = int(os.environ.get('SUMMARY_END_HOUR', '8'))
+        except Exception:
+            end_hour = 8
+
+        # Normalize hours into 0-23 range
+        start_hour = max(0, min(23, start_hour))
+        end_hour = max(0, min(23, end_hour))
+
+        now_hour = datetime.now().hour
+        if start_hour == end_hour:
+            # 24-hour window (always allowed)
+            within_window = True
+        elif start_hour < end_hour:
+            # Same-day window
+            within_window = start_hour <= now_hour < end_hour
+        else:
+            # Overnight window (e.g., 22 -> 6)
+            within_window = (now_hour >= start_hour) or (now_hour < end_hour)
+
         return jsonify({
             'worker_running': worker_running,
             'queue_stats': {
@@ -1746,6 +1822,12 @@ def get_worker_status():
                 'ready': summary_ready,
                 'failed': summary_failed,
                 'total': summary_pending + summary_processing + summary_ready + summary_failed
+            },
+            'summary_window': {
+                'start_hour': start_hour,
+                'end_hour': end_hour,
+                'now_hour': now_hour,
+                'within_window': within_window
             }
         })
         
@@ -2398,6 +2480,8 @@ def api_get_file_details(file_id):
             'transcoded_raw_file': file_obj.transcoded_raw_file,
             'summary_raw_file': file_obj.summary_raw_file,
             'human_notes': file_obj.human_notes,
+            'ai_summary': getattr(file_obj, 'ai_summary', None),
+            'status_summary': getattr(file_obj, 'status_summary', None),
             'date_processed': file_obj.date_processed.isoformat() if file_obj.date_processed else None,
             'time_to_process': file_obj.time_to_process,
             'is_project_important': file_obj.is_project_important,

@@ -26,6 +26,7 @@ import argparse
 import json
 import requests
 from typing import Optional
+from datetime import datetime, time as dtime
 
 # Ensure local imports work
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -82,17 +83,28 @@ def call_ollama(prompt: str) -> Optional[str]:
 
 
 def get_next_to_summarize(db) -> Optional[ChatFile]:
-    # Only files that were processed successfully and have content
-    q = (
+    """Fetch next file to summarize.
+    Strategy: prefer pending (status NULL/0). Only if none exist, retry failed (status 3).
+    """
+    base = (
         db.query(ChatFile)
         .filter(ChatFile.has_been_processed == 2)
         .filter((ChatFile.ai_summary == None) | (ChatFile.ai_summary == ""))
-        .filter((ChatFile.status_summary == None) | (ChatFile.status_summary == 0) | (ChatFile.status_summary == 3))
-        .order_by(ChatFile.upload_date.desc())
     )
-    chat_file = q.first()
+
+    # 1) Prefer pending
+    pending_q = base.filter((ChatFile.status_summary == None) | (ChatFile.status_summary == 0))\
+                   .order_by(ChatFile.upload_date.desc())
+    chat_file = pending_q.first()
+
+    # 2) If no pending, allow retries of failed
     if not chat_file:
-        return None
+        failed_q = base.filter(ChatFile.status_summary == 3)\
+                      .order_by(ChatFile.upload_date.desc())
+        chat_file = failed_q.first()
+        if not chat_file:
+            return None
+
     # Mark as processing and commit so other workers won't pick it up
     chat_file.status_summary = 1
     db.commit()
@@ -146,6 +158,8 @@ def main():
     parser.add_argument('--once', action='store_true', help='Process one batch and exit')
     parser.add_argument('--loop', action='store_true', help='Run continuously (daemon mode)')
     parser.add_argument('--sleep', type=int, default=15, help='Sleep seconds between batches in loop mode (default: 15)')
+    parser.add_argument('--start-hour', type=int, default=int(os.environ.get('SUMMARY_START_HOUR', '1')), help='Allowed start hour (0-23), default 1')
+    parser.add_argument('--end-hour', type=int, default=int(os.environ.get('SUMMARY_END_HOUR', '8')), help='Allowed end hour (0-23), default 8')
     args = parser.parse_args()
 
     if not args.once and not args.loop:
@@ -161,9 +175,24 @@ def main():
         print("✅ Completed" if had_work else "📭 Nothing to do")
     else:
         print(f"🔄 Running in daemon mode (checking every {args.sleep}s)")
+        # Configure processing window
+        start_h = max(0, min(23, args.start_hour))
+        end_h = max(0, min(23, args.end_hour))
+        start_t = dtime(hour=start_h, minute=0)
+        end_t = dtime(hour=end_h, minute=0)
+        print(f"⏱️ Allowed processing window: {start_t.strftime('%H:%M')} - {end_t.strftime('%H:%M')} (local time)")
         print("Press Ctrl+C to stop")
         try:
             while True:
+                now_t = datetime.now().time()
+                # Only process within [start_t, end_t) window
+                within_window = start_t <= now_t < end_t if start_t < end_t else not (end_t <= now_t < start_t)
+                if not within_window:
+                    # Outside window: sleep and continue without touching the queue
+                    print(f"⏸️  Outside allowed hours (now {now_t.strftime('%H:%M')}), sleeping {args.sleep}s")
+                    time.sleep(args.sleep)
+                    continue
+
                 had_work = process_one_batch()
                 time.sleep(1 if had_work else args.sleep)
         except KeyboardInterrupt:

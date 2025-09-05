@@ -65,9 +65,8 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-storage/uploads/
-storage/temp/
-storage/logs/
+storage/
+.venv/
 config/local_config.py
 
 # Backup files
