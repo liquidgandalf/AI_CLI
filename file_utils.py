@@ -41,6 +41,7 @@ FILE_TYPE_MAPPINGS = {
     'text/javascript': 'text',
     'application/json': 'text',
     'application/xml': 'text',
+    'text/tab-separated-values': 'text',
     
     # Document files
     'application/pdf': 'document',
@@ -52,21 +53,28 @@ FILE_TYPE_MAPPINGS = {
     'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'document',
     'text/csv': 'document',
     'application/vnd.oasis.opendocument.spreadsheet': 'document',
+    'application/vnd.oasis.opendocument.text': 'document',
+    'application/vnd.oasis.opendocument.presentation': 'document',
+    'application/rtf': 'document',
+    'application/x-rtf': 'document',
     
     # Archive files
     'application/zip': 'archive',
     'application/x-tar': 'archive',
     'application/gzip': 'archive',
     'application/x-rar-compressed': 'archive',
+    
+    # Additional images for OCR
+    'image/tiff': 'image',
 }
 
 # File size limits (in bytes)
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 ALLOWED_EXTENSIONS = {
     'audio': {'mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'mpga'},
-    'image': {'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'},
-    'text': {'txt', 'md', 'html', 'css', 'js', 'json', 'xml', 'py', 'sql'},
-    'document': {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'ods'},
+    'image': {'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tif', 'tiff'},
+    'text': {'txt', 'md', 'html', 'css', 'js', 'json', 'xml', 'py', 'sql', 'tsv'},
+    'document': {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'ods', 'odt', 'odp', 'rtf'},
     'archive': {'zip', 'tar', 'gz', 'rar'},
 }
 
